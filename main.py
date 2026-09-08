@@ -2,6 +2,7 @@ import pygame
 import sys
 import requests
 import json
+import re
 
 # ---------- 初始化 ----------
 pygame.init()
@@ -41,14 +42,15 @@ def ask_local_model(prompt):
     try:
         response = requests.post(url, json=payload, timeout=120)
         if response.status_code == 200:
-            return response.json().get("response", "模型未返回内容")
+            raw = response.json().get("response", "")
+            cleaned = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL)
+            return cleaned.strip() if cleaned.strip() else "（模型未返回有效回复）"
         else:
             return f"本地API报错: {response.status_code}"
     except requests.exceptions.ConnectionError:
         return "错误：请确认Ollama正在运行"
     except Exception as e:
         return f"错误: {str(e)}"
-
 # ---------- 游戏主循环 ----------
 running = True
 ai_text = "按 [空格键] 呼叫核心叙事者"
