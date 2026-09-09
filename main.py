@@ -15,8 +15,7 @@ HEIGHT = MAP_ROWS * CELL_SIZE + 80  # 底部留80像素显示AI文字
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
-font = pygame.font.Font(None, 30)
-
+font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
 map_data = [
     [1, 1, 1, 1, 1, 1, 1, 1],
@@ -54,6 +53,8 @@ def ask_local_model(prompt):
 # ---------- 游戏主循环 ----------
 running = True
 ai_text = "按 [空格键] 呼叫核心叙事者"
+scroll_index = 0
+ai_lines = []
 
 while running:
     # --- 事件处理 ---
@@ -79,7 +80,24 @@ while running:
                 print("正在呼叫DeepSeek...")
                 reply =ask_local_model ("我站在数字迷宫的中央，四周是冰冷的代码墙壁。请用一句话描述此刻的氛围，并给我一句鼓励。")
                 ai_text = reply
+                scroll_index = 0
+                # 按每行30个字符切分（可根据字体大小调整）
+                chars_per_line = 30
+                lines = []
+                for i in range(0, len(reply), chars_per_line):
+                    lines.append(reply[i:i+chars_per_line])
+                ai_lines = lines
                 print("AI回应:", reply)
+
+             # 上下键滚动显示
+            if event.key == pygame.K_UP:
+                if ai_lines and scroll_index > 0:
+                    scroll_index -= 1
+                    ai_text = ai_lines[scroll_index] if ai_lines else "（空）"
+            if event.key == pygame.K_DOWN:
+                if ai_lines and scroll_index < len(ai_lines) - 1:
+                    scroll_index += 1
+                    ai_text = ai_lines[scroll_index] if ai_lines else "（空）"
 
     # --- 绘制画面 ---
     screen.fill((10, 10, 30))  # 深空底色
@@ -105,7 +123,17 @@ while running:
 
     # 3. 底部显示AI文字（黑色背景条）
     pygame.draw.rect(screen, (0, 0, 0, 128), (0, HEIGHT - 80, WIDTH, 80))
+    # 显示当前行内容
     text_surface = font.render(ai_text, True, (200, 220, 255))
+    screen.blit(text_surface, (20, HEIGHT - 50))
+    # 显示行号提示
+    if ai_lines:
+        page_info = f"{scroll_index + 1}/{len(ai_lines)}"
+        info_surface = font.render(page_info, True, (150, 150, 180))
+        screen.blit(info_surface, (WIDTH - 80, HEIGHT - 50))
+    # 操作提示
+    tip = font.render("方向键移动 | SPACE呼叫AI | ↑↓翻页", True, (100, 120, 150))
+    screen.blit(tip, (20, 15))
     screen.blit(text_surface, (20, HEIGHT - 50))
 
     # 4. 操作提示
