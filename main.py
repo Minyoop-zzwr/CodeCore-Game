@@ -3,6 +3,7 @@ import sys
 import requests
 import json
 import re
+import math
 
 # ---------- 初始化 ----------
 pygame.init()
@@ -17,27 +18,28 @@ pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
+# ---------- 地图数据 (0=空地, 1=墙壁) ----------
 maze_template = [
-    "################################",
-    "#..............................#",
-    "#.##.####.#....#.####.#.####.#.#",
-    "#.#....#..#.#.##.#.#..#.#....#.#",
-    "#.#.##.#..#.#.##.#.#.##.#.##.#.#",
-    "#...#..#....#....#....#..#....#.#",
-    "###.#.####.####.####.####.#.###.#",
-    "#...#....#....#....#....#....#..#",
-    "#.###.##.#.##.#.##.#.##.#.##.###.#",
-    "#.....#..#..#...#..#..#.....#....#",
-    "#.#####.##.###.###.##.#####.#.##.#",
-    "#.#....#....#.......#....#....#..#",
-    "#.#.####.##.#.#####.#.##.####.##.#",
-    "#...#..#..#.#.....#.#..#....#...#",
-    "###.#.##.#.##.###.#.##.#.##.###.#",
-    "#.....#..#....#....#....#....#..#",
-    "#.#####.#.####.####.####.#.###.##",
-    "#.#....#.#....#....#....#.#...#..",
-    "#...#..#....#....#....#..#..#...#",
-    "################################"
+    ".###############################",
+    "..#...#.........#.............##",
+    "....#.#.#######.#.#########.#.##",
+    "#.#.....#.....#...........#.#.##",
+    "#.###.#.#####.#######.#.#.#.#.##",
+    "#.......#.......#.....#.#.#...##",
+    "#.#.#.#.#.#.##.##.###...#.#.#.##",
+    "#...#.#...#.#.........#.......##",
+    "#.#.#...###.#.###.#.#.#.###.#.##",
+    "#.#...#.......#.....#...#...#.##",
+    "#.#.###.#.#####.#.####.######.##",
+    "#.#.......#.#.................##",
+    "#.#.#.###...#.#####.#######.#.##",
+    "#.....#...#.......#...........##",
+    "#.#.#...#.#.#####.#.##.##.#.#.##",
+    "#...#.#.......#...#.....#.#.#.##",
+    "#.#.#.#####.#.#.#####.#.#.#.#.##",
+    "#...........#........#..........",
+    "###############################.",
+    "###############################."
 ]
 MAP_ROWS = len(maze_template)
 MAP_COLS = len(maze_template[0])
@@ -95,13 +97,18 @@ def wrap_text(text, font, max_width):
 running = True
 ai_text = "按 [空格键] 呼叫核心叙事者"
 
+# ---------- 开场动画状态 ----------
+game_state = "intro"          # 状态：intro 或 playing
+intro_start_time = pygame.time.get_ticks()  # 记录开场开始时间
+intro_duration = 6000         # 总时长 6 秒（单位：毫秒）
+
 while running:
     # --- 事件处理 ---
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and game_state == "playing":
             # 计算移动后的新坐标
             new_x, new_y = player_x, player_y
             if event.key == pygame.K_UP:    new_y -= 1
@@ -149,6 +156,22 @@ while running:
             else:
                 # 空地（深色网格）
                 pygame.draw.rect(screen, (20, 20, 35), (x, y, CELL_SIZE, CELL_SIZE), 1)
+
+    # --- 迷雾遮罩层 ---
+    map_surface = pygame.Surface((WIDTH, MAP_ROWS * CELL_SIZE), pygame.SRCALPHA)
+    player_center_x = player_x * CELL_SIZE + CELL_SIZE // 2
+    player_center_y = player_y * CELL_SIZE + CELL_SIZE // 2
+    for row in range(MAP_ROWS):
+        for col in range(MAP_COLS):
+            cell_center_x = col * CELL_SIZE + CELL_SIZE // 2
+            cell_center_y = row * CELL_SIZE + CELL_SIZE // 2
+            dist = math.sqrt((cell_center_x - player_center_x) ** 2 + (cell_center_y - player_center_y) ** 2) / CELL_SIZE
+            if dist > 5.0:
+                alpha = 255
+            else:
+                alpha = int((dist / 5.0) * 255)
+            pygame.draw.rect(map_surface, (30, 30, 30, alpha), (col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+    screen.blit(map_surface, (0, 0))
     
     # 2. 绘制玩家（发光圆球）
     center_x = player_x * CELL_SIZE + CELL_SIZE // 2
@@ -184,6 +207,40 @@ while running:
     # 左上角：移动和呼叫AI
     tip_move = font.render("方向键移动 | SPACE呼叫AI", True, (100, 120, 150))
     screen.blit(tip_move, (20, 15))
+
+    # --- 开场动画叠加层 ---
+    if game_state == "intro":
+        elapsed = pygame.time.get_ticks() - intro_start_time
+        
+        if elapsed >= intro_duration:
+            game_state = "playing"
+        else:
+            # 计算黑幕透明度：前3秒完全不透明，后3秒逐渐淡出
+            if elapsed < 3000:
+                overlay_alpha = 255
+            else:
+                overlay_alpha = max(0, 255 - int((elapsed - 3000) / 3000 * 255))
+            
+            overlay = pygame.Surface((WIDTH, HEIGHT))
+            overlay.set_alpha(overlay_alpha)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
+            
+            # 计算文字透明度
+            if elapsed < 1000:
+                text_alpha = 0
+            elif elapsed < 3000:
+                text_alpha = int((elapsed - 1000) / 2000 * 255)
+            else:
+                text_alpha = max(0, 255 - int((elapsed - 3000) / 3000 * 255))
+            
+            # 显示章节标题
+            if text_alpha > 0:
+                intro_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 36)
+                title_surface = intro_font.render("CHAPTER 1: DESCEND", True, (150, 150, 150))
+                title_surface.set_alpha(text_alpha)
+                title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+                screen.blit(title_surface, title_rect)
 
     pygame.display.flip()
     clock.tick(60)
