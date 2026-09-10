@@ -6,28 +6,38 @@ import re
 
 # ---------- 初始化 ----------
 pygame.init()
-CELL_SIZE = 45  # 每格像素
-# 地图尺寸：16列 x 10行
-MAP_COLS = 16
-MAP_ROWS = 10
+CELL_SIZE = 30  # 每格像素
+# 地图尺寸：32列 x 20行
+MAP_COLS = 32
+MAP_ROWS = 20
 WIDTH = MAP_COLS * CELL_SIZE
-HEIGHT = MAP_ROWS * CELL_SIZE + 80  # 底部留80像素显示AI文字
+HEIGHT = MAP_ROWS * CELL_SIZE + 150  # 底部留150像素显示AI文字
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
 maze_template = [
-    "################",
-    "#..#....#......#",
-    "#..#.##.#.####.#",
-    "#....#..#....#.#",
-    "#.##.####.#..#.#",
-    "#..#......#..#.#",
-    "#.#.####.##..#.#",
-    "#.#....#....#..#",
-    "#..####.#.####.#",
-    "################"
+    "################################",
+    "#..............................#",
+    "#.##.####.#....#.####.#.####.#.#",
+    "#.#....#..#.#.##.#.#..#.#....#.#",
+    "#.#.##.#..#.#.##.#.#.##.#.##.#.#",
+    "#...#..#....#....#....#..#....#.#",
+    "###.#.####.####.####.####.#.###.#",
+    "#...#....#....#....#....#....#..#",
+    "#.###.##.#.##.#.##.#.##.#.##.###.#",
+    "#.....#..#..#...#..#..#.....#....#",
+    "#.#####.##.###.###.##.#####.#.##.#",
+    "#.#....#....#.......#....#....#..#",
+    "#.#.####.##.#.#####.#.##.####.##.#",
+    "#...#..#..#.#.....#.#..#....#...#",
+    "###.#.##.#.##.###.#.##.#.##.###.#",
+    "#.....#..#....#....#....#....#..#",
+    "#.#####.#.####.####.####.#.###.##",
+    "#.#....#.#....#....#....#.#...#..",
+    "#...#..#....#....#....#..#..#...#",
+    "################################"
 ]
 MAP_ROWS = len(maze_template)
 MAP_COLS = len(maze_template[0])
@@ -66,11 +76,24 @@ def ask_local_model(prompt):
         return "错误：请确认Ollama正在运行"
     except Exception as e:
         return f"错误: {str(e)}"
+
+def wrap_text(text, font, max_width):
+    """将长文本按最大宽度自动换行，返回行列表"""
+    lines = []
+    current_line = ""
+    for char in text:
+        test_line = current_line + char
+        if font.size(test_line)[0] <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = char
+    if current_line:
+        lines.append(current_line)
+    return lines
 # ---------- 游戏主循环 ----------
 running = True
 ai_text = "按 [空格键] 呼叫核心叙事者"
-scroll_index = 0
-ai_lines = []
 
 while running:
     # --- 事件处理 ---
@@ -96,24 +119,8 @@ while running:
                 print("正在呼叫DeepSeek...")
                 reply =ask_local_model ("我站在数字迷宫的中央，四周是冰冷的代码墙壁。请用一段连贯、富有文学性和激励性的文字描述此刻的氛围，并自然融入一句鼓励的话。请直接输出最终回答，字数控制在20字内，不要包含任何分析过程、推理、或额外注释。")
                 ai_text = reply
-                scroll_index = 0
-                # 按每行30个字符切分（可根据字体大小调整）
-                chars_per_line = 30
-                lines = []
-                for i in range(0, len(reply), chars_per_line):
-                    lines.append(reply[i:i+chars_per_line])
-                ai_lines = lines
                 print("AI回应:", reply)
 
-             # 上下键滚动显示
-            if event.key == pygame.K_UP:
-                if ai_lines and scroll_index > 0:
-                    scroll_index -= 1
-                    ai_text = ai_lines[scroll_index] if ai_lines else "（空）"
-            if event.key == pygame.K_DOWN:
-                if ai_lines and scroll_index < len(ai_lines) - 1:
-                    scroll_index += 1
-                    ai_text = ai_lines[scroll_index] if ai_lines else "（空）"
 
     # --- 绘制画面 ---
     screen.fill((10, 10, 30))  # 深空底色
@@ -149,25 +156,34 @@ while running:
     pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)  # 青色
     pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)  # 外发光
 
-    # 3. 底部显示AI文字（黑色背景条）
-    pygame.draw.rect(screen, (0, 0, 0, 128), (0, HEIGHT - 80, WIDTH, 80))
-    # 显示当前行内容
-    text_surface = font.render(ai_text, True, (200, 220, 255))
-    screen.blit(text_surface, (20, HEIGHT - 50))
-    # 显示行号提示
-    if ai_lines:
-        page_info = f"{scroll_index + 1}/{len(ai_lines)}"
-        info_surface = font.render(page_info, True, (150, 150, 180))
-        screen.blit(info_surface, (WIDTH - 80, HEIGHT - 50))
+      # 3. 对话框显示AI文字（RPG风格）
+    box_margin = 10
+    box_height = 150 - 2 * box_margin
+    box_y = MAP_ROWS * CELL_SIZE + box_margin
+    box_width = WIDTH - 2 * box_margin
+    box_rect = pygame.Rect(box_margin, box_y, box_width, box_height)
+
+    # 半透明黑色背景
+    box_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
+    box_surface.fill((0, 0, 0, 180))
+    screen.blit(box_surface, (box_margin, box_y))
+
+    # 边框
+    pygame.draw.rect(screen, (100, 120, 150), box_rect, 2)
+
+    # 自动换行渲染文本
+    max_text_width = box_width - 20
+    lines = wrap_text(ai_text, font, max_text_width)
+    line_height = font.get_linesize()
+    max_lines = (box_height - 20) // line_height
+
+    for i, line in enumerate(lines[:max_lines]):
+        text_surface = font.render(line, True, (200, 220, 255))
+        screen.blit(text_surface, (box_margin + 10, box_y + 10 + i * line_height))
     # 操作提示
     # 左上角：移动和呼叫AI
     tip_move = font.render("方向键移动 | SPACE呼叫AI", True, (100, 120, 150))
     screen.blit(tip_move, (20, 15))
-
-    # 右上角：翻页提示
-    tip_page = font.render("↑↓ 翻页", True, (100, 120, 150))
-    screen.blit(tip_page, (WIDTH - 120, 15))
-    screen.blit(text_surface, (20, HEIGHT - 50))
 
     pygame.display.flip()
     clock.tick(60)
