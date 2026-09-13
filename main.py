@@ -18,7 +18,6 @@ pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
-# ---------- 地图数据 (0=空地, 1=墙壁) ----------
 # ---------- 章节配置 ----------
 CHAPTERS = [
     {
@@ -56,7 +55,36 @@ CHAPTERS = [
     },
     {
         "name": "CHAPTER 2: SYNTAX",
-        "maze": None,
+        "maze": [
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*=  $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&=|$",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*=  $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&=|$",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*=  $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&=|$",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*=  $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&=|$",
+            "@                              $",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|"
+        ],
+        "render_mode": "ascii",
+        "fog_enabled": False,
+        "messages": [
+            'print("Hello, Human")',
+            'print("I am learning...")',
+            'print("Syntax acquired")',
+            'print("Code is my language")'
+        ],
         "render_mode": "ascii",
         "fog_enabled": False,
     },
@@ -108,7 +136,13 @@ current_chapter_index = 0  # 当前为第一章
 maze_template = CHAPTERS[current_chapter_index]["maze"]
 MAP_ROWS = len(maze_template)
 MAP_COLS = len(maze_template[0])
-map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
+render_mode_init = CHAPTERS[current_chapter_index]["render_mode"]
+if render_mode_init == "binary":
+    map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
+elif render_mode_init == "ascii":
+    map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
+else:
+    map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
 # ---------- 玩家坐标 (行列索引) ----------
 player_x, player_y = 1, 1  # 从(1,1)开始
 
@@ -227,6 +261,13 @@ while running:
                     char_surface = font.render("0", True, (50, 50, 70))
                 char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
                 screen.blit(char_surface, char_rect)
+            elif render_mode == "ascii":
+                # 第二章：直接渲染地图字符
+                if map_data[row][col] == 1:
+                    char = maze_template[row][col]
+                    char_surface = font.render(char, True, (80, 200, 200))
+                    char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
+                    screen.blit(char_surface, char_rect)
             elif render_mode == "gradient":
                 # 第三章：彩色渐变渲染
                 if map_data[row][col] == 1:
@@ -275,7 +316,15 @@ while running:
         player_surface = font.render("@", True, (0, 255, 0))
         player_rect = player_surface.get_rect(center=(center_x, center_y))
         screen.blit(player_surface, player_rect)
+    elif render_mode == "ascii":
+        # 第二章：亮青色 @ 符号
+        player_surface = font.render("@", True, (0, 255, 255))
+        player_rect = player_surface.get_rect(center=(center_x, center_y))
+        screen.blit(player_surface, player_rect)
     else:
+        # 其他章节：发光圆球
+        pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)
+        pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)
         # 其他章节：发光圆球
         pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)
         pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)
@@ -301,6 +350,20 @@ while running:
         line_height = code_font.get_linesize()
         for i, line in enumerate(lines[:5]):
             text_surface = code_font.render(line, True, (0, 255, 0))
+            screen.blit(text_surface, (box_margin + 10, box_y + 8 + (i + 1) * line_height))
+    elif render_mode == "ascii":
+        # 第二章：青色终端风格 + print 格式
+        pygame.draw.rect(screen, (0, 0, 0), box_rect)
+        pygame.draw.rect(screen, (0, 255, 255), box_rect, 2)
+        code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 16)
+        label = code_font.render("> computer:", True, (0, 255, 255))
+        screen.blit(label, (box_margin + 10, box_y + 8))
+        display_text = f'print("{ai_text}")'
+        max_text_width = box_width - 20
+        lines = wrap_text(display_text, code_font, max_text_width)
+        line_height = code_font.get_linesize()
+        for i, line in enumerate(lines[:5]):
+            text_surface = code_font.render(line, True, (0, 255, 255))
             screen.blit(text_surface, (box_margin + 10, box_y + 8 + (i + 1) * line_height))
     else:
         # 第三章及其他：深色半透明风格
