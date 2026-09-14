@@ -88,7 +88,7 @@ CHAPTERS = [
         ],
         "render_mode": "ascii",
         "fog_enabled": False,
-                "move_cooldown": 75,
+        "move_cooldown": 75,
     },
     {
         "name": "CHAPTER 3: AWAKEN",
@@ -154,7 +154,7 @@ CHAPTERS = [
     },
 ]
 
-current_chapter_index = 3  # 当前为第一章
+current_chapter_index = 0  # 当前为第一章
 
 # 加载当前章节的地图
 maze_template = CHAPTERS[current_chapter_index]["maze"]
