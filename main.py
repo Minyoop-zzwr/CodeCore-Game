@@ -56,9 +56,36 @@ CHAPTERS = [
     },
     {
         "name": "CHAPTER 2: SYNTAX",
-        "maze": None,
+        "maze": [
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|<>",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@                              $",
+            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@                              $",
+            "@                              $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|<>"
+        ],
         "render_mode": "ascii",
         "fog_enabled": False,
+        "messages": [
+            'print("Hello, Human")',
+            'print("I am learning...")',
+            'print("Syntax acquired")',
+            'print("Code is my language")'
+        ],
     },
     {
         "name": "CHAPTER 3: AWAKEN",
@@ -102,15 +129,29 @@ CHAPTERS = [
     },
 ]
 
-current_chapter_index = 0  # 当前为第一章
+current_chapter_index = 0
 
-# 加载当前章节的地图
-maze_template = CHAPTERS[current_chapter_index]["maze"]
-MAP_ROWS = len(maze_template)
-MAP_COLS = len(maze_template[0])
-map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
-# ---------- 玩家坐标 (行列索引) ----------
-player_x, player_y = 1, 1  # 从(1,1)开始
+# ---------- 章节加载函数 ----------
+def load_chapter(index):
+    global current_chapter_index, maze_template, MAP_ROWS, MAP_COLS, map_data, player_x, player_y, ai_text, game_state, transition_state
+    current_chapter_index = index
+    maze_template = CHAPTERS[index]["maze"]
+    # 自动补齐行宽，避免行长不一致
+    _max_len = max(len(r) for r in maze_template)
+    maze_template = [r.ljust(_max_len, ' ') for r in maze_template]
+    MAP_ROWS = len(maze_template)
+    MAP_COLS = len(maze_template[0])
+    rm = CHAPTERS[index]["render_mode"]
+    if rm == "binary":
+        map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
+    elif rm == "ascii":
+        map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
+    else:
+        map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
+    player_x, player_y = 1, 1
+    ai_text = "按 [空格键] 呼叫核心叙事者"
+
+load_chapter(0)
 
 # ---------- DeepSeek 函数 ----------
 def ask_local_model(prompt):
@@ -171,6 +212,11 @@ intro_duration = 6000         # 总时长 6 秒（单位：毫秒）
 MOVE_COOLDOWN = 150  # 移动间隔（毫秒）
 last_move_time = 0   # 上次移动的时间
 
+# ---------- 章节过渡状态 ----------
+transition_state = "none"   # none / fading_out / title / fading_in
+transition_start_time = 0
+next_chapter_index = 0
+
 while running:
         
     # --- 事件处理 ---
@@ -191,9 +237,23 @@ while running:
                     reply = ask_local_model("我站在数字迷宫的中央，四周是冰冷的代码墙壁。请用一段连贯、富有文学性和激励性的文字描述此刻的氛围，并自然融入一句鼓励的话。请直接输出最终回答，字数控制在20字内，不要包含任何分析过程、推理、或额外注释。")
                     ai_text = reply
                     print("AI回应:", reply)
+
+        # 在出口处按 Enter 键触发章节过渡
+        if event.type == pygame.KEYDOWN and game_state == "playing" and transition_state == "none":
+            if event.key == pygame.K_RETURN:
+                exit_col = MAP_COLS - 2
+                exit_row = MAP_ROWS - 2
+                if player_x == exit_col and player_y == exit_row:
+                    next_chapter_index = current_chapter_index + 1
+                    if next_chapter_index < len(CHAPTERS):
+                        transition_state = "fading_out"
+                        transition_start_time = pygame.time.get_ticks()
+                        print("章节过渡开始...")
+                    else:
+                        print("已完成所有章节")
     
     # --- 长按持续移动 ---
-    if game_state == "playing":
+    if game_state == "playing" and transition_state == "none":
         keys = pygame.key.get_pressed()
         current_time = pygame.time.get_ticks()
         if current_time - last_move_time > MOVE_COOLDOWN:
@@ -227,6 +287,13 @@ while running:
                     char_surface = font.render("0", True, (50, 50, 70))
                 char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
                 screen.blit(char_surface, char_rect)
+            elif render_mode == "ascii":
+                # 第二章：ASCII 字符渲染
+                if map_data[row][col] == 1:
+                    char = maze_template[row][col]
+                    char_surface = font.render(char, True, (80, 200, 200))
+                    char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
+                    screen.blit(char_surface, char_rect)
             elif render_mode == "gradient":
                 # 第三章：彩色渐变渲染
                 if map_data[row][col] == 1:
@@ -275,6 +342,11 @@ while running:
         player_surface = font.render("@", True, (0, 255, 0))
         player_rect = player_surface.get_rect(center=(center_x, center_y))
         screen.blit(player_surface, player_rect)
+    elif render_mode == "ascii":
+        # 第二章：亮青色 @ 符号
+        player_surface = font.render("@", True, (0, 255, 255))
+        player_rect = player_surface.get_rect(center=(center_x, center_y))
+        screen.blit(player_surface, player_rect)
     else:
         # 其他章节：发光圆球
         pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)
@@ -301,6 +373,20 @@ while running:
         line_height = code_font.get_linesize()
         for i, line in enumerate(lines[:5]):
             text_surface = code_font.render(line, True, (0, 255, 0))
+            screen.blit(text_surface, (box_margin + 10, box_y + 8 + (i + 1) * line_height))
+    elif render_mode == "ascii":
+        # 第二章：青色终端风格 + print 格式
+        pygame.draw.rect(screen, (0, 0, 0), box_rect)
+        pygame.draw.rect(screen, (0, 255, 255), box_rect, 2)
+        code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 16)
+        label = code_font.render("> computer:", True, (0, 255, 255))
+        screen.blit(label, (box_margin + 10, box_y + 8))
+        display_text = f'print("{ai_text}")'
+        max_text_width = box_width - 20
+        lines = wrap_text(display_text, code_font, max_text_width)
+        line_height = code_font.get_linesize()
+        for i, line in enumerate(lines[:5]):
+            text_surface = code_font.render(line, True, (0, 255, 255))
             screen.blit(text_surface, (box_margin + 10, box_y + 8 + (i + 1) * line_height))
     else:
         # 第三章及其他：深色半透明风格
@@ -349,6 +435,47 @@ while running:
                 title_surface.set_alpha(text_alpha)
                 title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
                 screen.blit(title_surface, title_rect)
+
+    # --- 章节过渡动画 ---
+    if transition_state != "none":
+        elapsed = pygame.time.get_ticks() - transition_start_time
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        
+        if transition_state == "fading_out":
+            # 淡出：1秒内黑幕从透明到不透明
+            alpha = min(255, int(elapsed / 1000 * 255))
+            overlay.set_alpha(alpha)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
+            if elapsed >= 1000:
+                # 切换地图
+                load_chapter(next_chapter_index)
+                transition_state = "title"
+                transition_start_time = pygame.time.get_ticks()
+        
+        elif transition_state == "title":
+            # 标题显示：2秒
+            overlay.set_alpha(255)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
+            title_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 36)
+            chapter_name = CHAPTERS[current_chapter_index]["name"]
+            title_surface = title_font.render(chapter_name, True, (150, 150, 150))
+            title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            screen.blit(title_surface, title_rect)
+            if elapsed >= 2000:
+                transition_state = "fading_in"
+                transition_start_time = pygame.time.get_ticks()
+        
+        elif transition_state == "fading_in":
+            # 淡入：1秒内黑幕从不透明到透明
+            alpha = max(0, 255 - int(elapsed / 1000 * 255))
+            overlay.set_alpha(alpha)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
+            if elapsed >= 1000:
+                transition_state = "none"
+                print(f"进入 {CHAPTERS[current_chapter_index]['name']}")
 
     pygame.display.flip()
     clock.tick(60)
