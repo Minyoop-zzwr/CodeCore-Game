@@ -18,7 +18,6 @@ pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
-# ---------- 地图数据 (0=空地, 1=墙壁) ----------
 # ---------- 章节配置 ----------
 CHAPTERS = [
     {
@@ -47,6 +46,7 @@ CHAPTERS = [
         ],
         "render_mode": "binary",
         "fog_enabled": False,
+        "move_cooldown": 75,   # 第一章移动间隔（越小越快）
         "messages": [
             "01001000 01100101 01101100 01101100 01101111",
             "01001000 01110101 01101101 01100001 01101110",
@@ -57,26 +57,26 @@ CHAPTERS = [
     {
         "name": "CHAPTER 2: SYNTAX",
         "maze": [
-            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|<>",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|",
             "@                              $",
-            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@#$%&*+=|<>{    );:~^@#$%&*=  $",
             "@                              $",
-            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@ @#   *+=|<>{}[]();:~^@#$%&=|$",
             "@                              $",
-            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@#$%&*+=|<>{}[]();:~^   %&*=  $",
             "@                              $",
-            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@ @#$%&*+=   {}[]();:~^@#$%&=|$",
             "@                              $",
-            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@#$%&*+=|<>{}[]();:~^@#$%&*=  $",
             "@                              $",
-            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@ @#$   +=|<>{}[]();:~^@#$%&=|$",
             "@                              $",
-            "@#$%&*+=|<>{}[]();:~^@#$%&*+ $",
+            "@#$%&*+=|<>{}[]();:~^@   &*=  $",
             "@                              $",
-            "@ @#$%&*+=|<>{}[]();:~^@#$%&*+",
+            "@ @#$%&*+=   {}[]();:~^@#$%&=|$",
             "@                              $",
             "@                              $",
-            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|<>"
+            "@#$%&*+=|<>{}[]();:~^@#$%&*+=|"
         ],
         "render_mode": "ascii",
         "fog_enabled": False,
@@ -86,6 +86,9 @@ CHAPTERS = [
             'print("Syntax acquired")',
             'print("Code is my language")'
         ],
+        "render_mode": "ascii",
+        "fog_enabled": False,
+                "move_cooldown": 75,
     },
     {
         "name": "CHAPTER 3: AWAKEN",
@@ -108,7 +111,7 @@ CHAPTERS = [
             "#...#.#.......#...#.....#.#.#.##",
             "#.#.#.#####.#.#.#####.#.#.#.#.##",
             "#...........#........#..........",
-            "###############################.",
+            "#############################. #",
             "###############################."
         ],
         "render_mode": "gradient",
@@ -117,9 +120,31 @@ CHAPTERS = [
     },
     {
         "name": "CHAPTER 4: CONTROL",
-        "maze": None,
+        "maze": [
+            "################################",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#..CCC..#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#########......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "#.......#......................#",
+            "################################"
+        ],
         "render_mode": "robot",
         "fog_enabled": False,
+        "messages": None,
     },
     {
         "name": "CHAPTER 5: BEYOND",
@@ -129,29 +154,23 @@ CHAPTERS = [
     },
 ]
 
-current_chapter_index = 0
+current_chapter_index = 3  # 当前为第一章
 
-# ---------- 章节加载函数 ----------
-def load_chapter(index):
-    global current_chapter_index, maze_template, MAP_ROWS, MAP_COLS, map_data, player_x, player_y, ai_text, game_state, transition_state
-    current_chapter_index = index
-    maze_template = CHAPTERS[index]["maze"]
-    # 自动补齐行宽，避免行长不一致
-    _max_len = max(len(r) for r in maze_template)
-    maze_template = [r.ljust(_max_len, ' ') for r in maze_template]
-    MAP_ROWS = len(maze_template)
-    MAP_COLS = len(maze_template[0])
-    rm = CHAPTERS[index]["render_mode"]
-    if rm == "binary":
-        map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
-    elif rm == "ascii":
-        map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
-    else:
-        map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
-    player_x, player_y = 1, 1
-    ai_text = "按 [空格键] 呼叫核心叙事者"
-
-load_chapter(0)
+# 加载当前章节的地图
+maze_template = CHAPTERS[current_chapter_index]["maze"]
+MAP_ROWS = len(maze_template)
+MAP_COLS = len(maze_template[0])
+render_mode_init = CHAPTERS[current_chapter_index]["render_mode"]
+if render_mode_init == "binary":
+    map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
+elif render_mode_init == "ascii":
+    map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
+elif render_mode_init == "robot":
+    map_data = [[1 if ch == '#' else (2 if ch == 'C' else 0) for ch in row] for row in maze_template]
+else:
+    map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
+# ---------- 玩家坐标 (行列索引) ----------
+player_x, player_y = 1, 1  # 从(1,1)开始
 
 # ---------- DeepSeek 函数 ----------
 def ask_local_model(prompt):
@@ -217,6 +236,139 @@ transition_state = "none"   # none / fading_out / title / fading_in
 transition_start_time = 0
 next_chapter_index = 0
 
+# ---------- 机械臂旋转控制 ----------
+ARM_COOLDOWN = 50   # 旋转间隔（毫秒）
+last_arm_move_time = 0
+ARM_ANGLE_STEP = 3  # 每次旋转的角度
+
+# ---------- 机械臂状态 ----------
+arm_base_col = 11
+arm_base_row = 16
+ARM1_LENGTH = 250   # 大臂
+ARM2_LENGTH = 180   # 中臂
+ARM3_LENGTH = 120   # 小臂
+arm_angle1 = 5      # 肩关节
+arm_angle2 = 150    # 肘关节（相对大臂）
+arm_angle3 = -30    # 腕关节（相对中臂）
+gripper_open = 0
+
+# ---------- 机械臂激活状态 ----------
+robot_mode_active = False
+
+# ---------- 第四章：方块与目标位置 ----------
+block_col = 18       # 方块初始列
+block_row = 14       # 方块初始行
+block_size = 20      # 方块像素大小
+target_col = 26      # 目标位置列
+target_row = 10      # 目标位置行
+is_carrying = False  # 是否正在抓取方块
+# ---------- 第四章：门 ----------
+door_open = False
+door_col = 4
+door_row = 0
+
+def get_tip_position():
+    """返回机械臂末端的像素坐标 (tip_x, tip_y)"""
+    base_x = arm_base_col * CELL_SIZE + CELL_SIZE // 2
+    base_y = arm_base_row * CELL_SIZE + CELL_SIZE // 2
+    rad1 = math.radians(arm_angle1)
+    rad2 = math.radians(arm_angle1 + arm_angle2)
+    rad3 = math.radians(arm_angle1 + arm_angle2 + arm_angle3)
+    elbow_x = base_x + ARM1_LENGTH * math.sin(rad1)
+    elbow_y = base_y - ARM1_LENGTH * math.cos(rad1)
+    wrist_x = elbow_x + ARM2_LENGTH * math.sin(rad2)
+    wrist_y = elbow_y - ARM2_LENGTH * math.cos(rad2)
+    tip_x = wrist_x + ARM3_LENGTH * math.sin(rad3)
+    tip_y = wrist_y - ARM3_LENGTH * math.cos(rad3)
+    return tip_x, tip_y
+
+def draw_robot_arm():
+    """绘制三关节机械臂：肩 → 肘 → 腕"""
+    base_x = arm_base_col * CELL_SIZE + CELL_SIZE // 2
+    base_y = arm_base_row * CELL_SIZE + CELL_SIZE // 2
+    
+    # 三个关节的绝对角度（弧度）
+    rad1 = math.radians(arm_angle1)
+    rad2 = math.radians(arm_angle1 + arm_angle2)
+    rad3 = math.radians(arm_angle1 + arm_angle2 + arm_angle3)
+    
+    # 肘关节位置
+    elbow_x = base_x + ARM1_LENGTH * math.sin(rad1)
+    elbow_y = base_y - ARM1_LENGTH * math.cos(rad1)
+    
+    # 腕关节位置
+    wrist_x = elbow_x + ARM2_LENGTH * math.sin(rad2)
+    wrist_y = elbow_y - ARM2_LENGTH * math.cos(rad2)
+    
+    # 末端位置
+    tip_x = wrist_x + ARM3_LENGTH * math.sin(rad3)
+    tip_y = wrist_y - ARM3_LENGTH * math.cos(rad3)
+    
+    # 绘制三段臂
+    pygame.draw.line(screen, (180, 180, 190), (base_x, base_y), (elbow_x, elbow_y), 10)
+    pygame.draw.line(screen, (180, 180, 190), (elbow_x, elbow_y), (wrist_x, wrist_y), 8)
+    pygame.draw.line(screen, (180, 180, 190), (wrist_x, wrist_y), (tip_x, tip_y), 6)
+    
+    # 绘制三个关节
+    pygame.draw.circle(screen, (100, 100, 110), (base_x, base_y), 16)
+    pygame.draw.circle(screen, (200, 200, 210), (elbow_x, elbow_y), 10)
+    pygame.draw.circle(screen, (200, 200, 210), (wrist_x, wrist_y), 8)
+    
+    # 绘制夹爪（在末端）
+    gripper_len = 15
+    gripper_angle_offset = 20 + gripper_open * 15
+    for side in [-1, 1]:
+        offset_rad = math.radians(arm_angle1 + arm_angle2 + arm_angle3 + side * gripper_angle_offset)
+        gx = tip_x + gripper_len * math.sin(offset_rad)
+        gy = tip_y - gripper_len * math.cos(offset_rad)
+        pygame.draw.line(screen, (220, 220, 230), (tip_x, tip_y), (gx, gy), 4)
+
+def draw_block():
+    """绘制方块（如果被抓取，跟随机械臂末端）"""
+    if is_carrying:
+        # 跟随机械臂末端
+        base_x = arm_base_col * CELL_SIZE + CELL_SIZE // 2
+        base_y = arm_base_row * CELL_SIZE + CELL_SIZE // 2
+        rad1 = math.radians(arm_angle1)
+        rad2 = math.radians(arm_angle1 + arm_angle2)
+        rad3 = math.radians(arm_angle1 + arm_angle2 + arm_angle3)
+        elbow_x = base_x + ARM1_LENGTH * math.sin(rad1)
+        elbow_y = base_y - ARM1_LENGTH * math.cos(rad1)
+        wrist_x = elbow_x + ARM2_LENGTH * math.sin(rad2)
+        wrist_y = elbow_y - ARM2_LENGTH * math.cos(rad2)
+        tip_x = wrist_x + ARM3_LENGTH * math.sin(rad3)
+        tip_y = wrist_y - ARM3_LENGTH * math.cos(rad3)
+        bx = tip_x - block_size // 2
+        by = tip_y - block_size // 2
+    else:
+        # 固定在初始位置
+        bx = block_col * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+        by = block_row * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+    
+    pygame.draw.rect(screen, (220, 180, 60), (bx, by, block_size, block_size))
+    pygame.draw.rect(screen, (255, 220, 120), (bx, by, block_size, block_size), 2)
+
+
+def draw_target():
+    """绘制目标位置（虚线框）"""
+    tx = target_col * CELL_SIZE
+    ty = target_row * CELL_SIZE
+    # 用四条短线段画虚线框
+    dash_len = 6
+    gap_len = 4
+    color = (80, 255, 120)
+    # 上下边
+    for x in range(tx, tx + CELL_SIZE, dash_len + gap_len):
+        end = min(x + dash_len, tx + CELL_SIZE)
+        pygame.draw.line(screen, color, (x, ty), (end, ty), 2)
+        pygame.draw.line(screen, color, (x, ty + CELL_SIZE), (end, ty + CELL_SIZE), 2)
+    # 左右边
+    for y in range(ty, ty + CELL_SIZE, dash_len + gap_len):
+        end = min(y + dash_len, ty + CELL_SIZE)
+        pygame.draw.line(screen, color, (tx, y), (tx, end), 2)
+        pygame.draw.line(screen, color, (tx + CELL_SIZE, y), (tx + CELL_SIZE, end), 2)
+
+
 while running:
         
     # --- 事件处理 ---
@@ -237,6 +389,44 @@ while running:
                     reply = ask_local_model("我站在数字迷宫的中央，四周是冰冷的代码墙壁。请用一段连贯、富有文学性和激励性的文字描述此刻的氛围，并自然融入一句鼓励的话。请直接输出最终回答，字数控制在20字内，不要包含任何分析过程、推理、或额外注释。")
                     ai_text = reply
                     print("AI回应:", reply)
+    
+        # 第四章：站在控制台旁边按 Enter 激活机械臂
+        if event.type == pygame.KEYDOWN and game_state == "playing" and render_mode == "robot":
+            if event.key == pygame.K_RETURN and not robot_mode_active:
+                if player_y == 4 and 2 <= player_x <= 6:
+                    robot_mode_active = True
+                    ai_text = "机械臂已激活，使用 Q/E 控制大臂，A/D 控制小臂，Z/C 控制腕关节"
+                    print("机械臂已激活")
+
+        # 第四章：按 F 键抓取/释放方块
+        if event.type == pygame.KEYDOWN and game_state == "playing" and render_mode == "robot" and robot_mode_active:
+            if event.key == pygame.K_f:
+                tip_x, tip_y = get_tip_position()
+                if is_carrying:
+                    # 释放方块
+                    new_col = int(tip_x // CELL_SIZE)
+                    new_row = int(tip_y // CELL_SIZE)
+                    if 1 <= new_col < MAP_COLS - 1 and 1 <= new_row < MAP_ROWS - 1:
+                        if map_data[new_row][new_col] != 1:
+                            is_carrying = False
+                            block_col = new_col
+                            block_row = new_row
+                            ai_text = "方块已放置"
+                            print("方块已放置")
+                            if block_col == target_col and block_row == target_row:
+                                ai_text = "任务完成！方块已到达目标位置。"
+                                print("第四章任务完成！")
+                                door_open = True
+                                map_data[door_row][door_col] = 0
+                else:
+                    # 尝试抓取
+                    block_center_x = block_col * CELL_SIZE + CELL_SIZE // 2
+                    block_center_y = block_row * CELL_SIZE + CELL_SIZE // 2
+                    dist = math.sqrt((tip_x - block_center_x) ** 2 + (tip_y - block_center_y) ** 2)
+                    if dist < CELL_SIZE:
+                        is_carrying = True
+                        ai_text = "方块已抓取"
+                        print("方块已抓取")
 
         # 在出口处按 Enter 键触发章节过渡
         if event.type == pygame.KEYDOWN and game_state == "playing" and transition_state == "none":
@@ -251,12 +441,13 @@ while running:
                         print("章节过渡开始...")
                     else:
                         print("已完成所有章节")
-    
+
     # --- 长按持续移动 ---
     if game_state == "playing" and transition_state == "none":
         keys = pygame.key.get_pressed()
         current_time = pygame.time.get_ticks()
-        if current_time - last_move_time > MOVE_COOLDOWN:
+        current_cooldown = CHAPTERS[current_chapter_index].get("move_cooldown", 150)
+        if current_time - last_move_time > current_cooldown:
             new_x, new_y = player_x, player_y
             moved = False
             if keys[pygame.K_UP]:    new_y -= 1; moved = True
@@ -269,6 +460,19 @@ while running:
                     if map_data[new_y][new_x] == 0:
                         player_x, player_y = new_x, new_y
                 last_move_time = current_time
+
+    # --- 机械臂旋转控制（仅第四章且已激活） ---
+    if game_state == "playing" and render_mode == "robot" and robot_mode_active:
+        keys = pygame.key.get_pressed()
+        current_time = pygame.time.get_ticks()
+        if current_time - last_arm_move_time > ARM_COOLDOWN:
+            if keys[pygame.K_q]: arm_angle1 -= ARM_ANGLE_STEP
+            if keys[pygame.K_e]: arm_angle1 += ARM_ANGLE_STEP
+            if keys[pygame.K_a]: arm_angle2 -= ARM_ANGLE_STEP
+            if keys[pygame.K_d]: arm_angle2 += ARM_ANGLE_STEP
+            if keys[pygame.K_z]: arm_angle3 -= ARM_ANGLE_STEP
+            if keys[pygame.K_c]: arm_angle3 += ARM_ANGLE_STEP
+            last_arm_move_time = current_time
 
 
     # --- 绘制画面 ---
@@ -288,7 +492,7 @@ while running:
                 char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
                 screen.blit(char_surface, char_rect)
             elif render_mode == "ascii":
-                # 第二章：ASCII 字符渲染
+                # 第二章：直接渲染地图字符
                 if map_data[row][col] == 1:
                     char = maze_template[row][col]
                     char_surface = font.render(char, True, (80, 200, 200))
@@ -311,6 +515,16 @@ while running:
                     pygame.draw.rect(screen, border_color, (x, y, CELL_SIZE, CELL_SIZE), 2)
                 else:
                     pygame.draw.rect(screen, (20, 20, 35), (x, y, CELL_SIZE, CELL_SIZE), 1)
+            elif render_mode == "robot":
+                # 第四章：深灰色墙壁，蓝色控制台，深色空地
+                if map_data[row][col] == 1:
+                    pygame.draw.rect(screen, (60, 60, 70), (x, y, CELL_SIZE, CELL_SIZE))
+                    pygame.draw.rect(screen, (90, 90, 100), (x, y, CELL_SIZE, CELL_SIZE), 2)
+                elif map_data[row][col] == 2:
+                    pygame.draw.rect(screen, (30, 60, 120), (x, y, CELL_SIZE, CELL_SIZE))
+                    pygame.draw.rect(screen, (0, 150, 255), (x, y, CELL_SIZE, CELL_SIZE), 3)
+                else:
+                    pygame.draw.rect(screen, (20, 20, 30), (x, y, CELL_SIZE, CELL_SIZE), 1)
             else:
                 # 默认渲染（后续章节）
                 if map_data[row][col] == 1:
@@ -347,10 +561,27 @@ while running:
         player_surface = font.render("@", True, (0, 255, 255))
         player_rect = player_surface.get_rect(center=(center_x, center_y))
         screen.blit(player_surface, player_rect)
+    elif render_mode == "robot":
+        # 第四章：先绘制目标位置和方块（在地图之上、玩家之下）
+        draw_target()
+        draw_block()
+        # 绘制机械臂
+        draw_robot_arm()
+        # 绘制门（如果已打开）
+        if door_open:
+            dx = door_col * CELL_SIZE
+            dy = door_row * CELL_SIZE
+            pygame.draw.rect(screen, (0, 200, 100), (dx, dy, CELL_SIZE, CELL_SIZE))
+            pygame.draw.rect(screen, (0, 255, 150), (dx, dy, CELL_SIZE, CELL_SIZE), 2)
+        # 绘制玩家
+        pygame.draw.circle(screen, (255, 150, 50), (center_x, center_y), 20)
+        pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)
+
     else:
         # 其他章节：发光圆球
         pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)
         pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)
+
 
           # 3. 对话框显示AI文字
     box_margin = 10
@@ -442,19 +673,33 @@ while running:
         overlay = pygame.Surface((WIDTH, HEIGHT))
         
         if transition_state == "fading_out":
-            # 淡出：1秒内黑幕从透明到不透明
             alpha = min(255, int(elapsed / 1000 * 255))
             overlay.set_alpha(alpha)
             overlay.fill((0, 0, 0))
             screen.blit(overlay, (0, 0))
             if elapsed >= 1000:
-                # 切换地图
-                load_chapter(next_chapter_index)
+                # 切换地图（简化版：直接更新索引和地图数据）
+                current_chapter_index = next_chapter_index
+                maze_template = CHAPTERS[current_chapter_index]["maze"]
+                _max_len = max(len(r) for r in maze_template)
+                maze_template = [r.ljust(_max_len, ' ') for r in maze_template]
+                MAP_ROWS = len(maze_template)
+                MAP_COLS = len(maze_template[0])
+                rm = CHAPTERS[current_chapter_index]["render_mode"]
+                if rm == "binary":
+                    map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
+                elif rm == "ascii":
+                    map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
+                elif rm == "robot":
+                    map_data = [[1 if ch == '#' else (2 if ch == 'C' else 0) for ch in row] for row in maze_template]
+                else:
+                    map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
+                player_x, player_y = 1, 1
+                ai_text = "按 [空格键] 呼叫核心叙事者"
                 transition_state = "title"
                 transition_start_time = pygame.time.get_ticks()
         
         elif transition_state == "title":
-            # 标题显示：2秒
             overlay.set_alpha(255)
             overlay.fill((0, 0, 0))
             screen.blit(overlay, (0, 0))
@@ -468,7 +713,6 @@ while running:
                 transition_start_time = pygame.time.get_ticks()
         
         elif transition_state == "fading_in":
-            # 淡入：1秒内黑幕从不透明到透明
             alpha = max(0, 255 - int(elapsed / 1000 * 255))
             overlay.set_alpha(alpha)
             overlay.fill((0, 0, 0))
