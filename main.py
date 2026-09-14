@@ -4,6 +4,69 @@ import requests
 import json
 import re
 import math
+import os
+
+def load_chapter_data():
+    """根据 current_chapter_index 重新加载地图数据"""
+    global maze_template, MAP_ROWS, MAP_COLS, map_data
+    chapter = CHAPTERS[current_chapter_index]
+    maze_template = chapter["maze"]
+    if maze_template is None:
+        return
+    # 自动补齐行宽
+    _max_len = max(len(r) for r in maze_template)
+    maze_template = [r.ljust(_max_len, ' ') for r in maze_template]
+    MAP_ROWS = len(maze_template)
+    MAP_COLS = len(maze_template[0])
+    rm = chapter["render_mode"]
+    if rm == "binary":
+        map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
+    elif rm == "ascii":
+        map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
+    elif rm == "robot":
+        map_data = [[1 if ch == '#' else (2 if ch == 'C' else 0) for ch in row] for row in maze_template]
+    else:
+        map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
+
+SAVE_FILE = "save.json"
+
+def save_game():
+    """保存当前游戏状态到文件"""
+    data = {
+        "chapter": current_chapter_index,
+        "player_x": player_x,
+        "player_y": player_y,
+    }
+    try:
+        with open(SAVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"存档失败: {e}")
+
+def load_game():
+    """从文件读取存档，返回 True 表示成功"""
+    global current_chapter_index, player_x, player_y
+    if not os.path.exists(SAVE_FILE):
+        return False
+    try:
+        with open(SAVE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        current_chapter_index = data.get("chapter", 0)
+        player_x = data.get("player_x", 1)
+        player_y = data.get("player_y", 1)
+        return True
+    except Exception as e:
+        print(f"读档失败: {e}")
+        return False
+
+def has_save():
+    """检查是否存在存档文件"""
+    return os.path.exists(SAVE_FILE)
+
+def delete_save():
+    """删除存档文件"""
+    if os.path.exists(SAVE_FILE):
+        os.remove(SAVE_FILE)
 
 # ---------- 初始化 ----------
 pygame.init()
@@ -223,7 +286,8 @@ running = True
 ai_text = "按 [空格键] 呼叫核心叙事者"
 
 # ---------- 开场动画状态 ----------
-game_state = "intro"          # 状态：intro 或 playing
+game_state = "menu"           # 状态：menu / intro / playing
+menu_selection = 0            # 菜单当前选中的选项（0=继续游戏，1=新游戏）
 intro_start_time = pygame.time.get_ticks()  # 记录开场开始时间
 intro_duration = 6000         # 总时长 6 秒（单位：毫秒）
 
@@ -375,6 +439,33 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
+        # --- 启动菜单按键处理 ---
+        if event.type == pygame.KEYDOWN and game_state == "menu":
+            if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
+                # 如果有存档，两个选项之间切换；没有存档，只能选"新游戏"
+                if has_save():
+                    menu_selection = 1 - menu_selection
+                else:
+                    menu_selection = 0
+            if event.key == pygame.K_RETURN:
+                if menu_selection == 0 and has_save():
+                    # 继续游戏
+                    if load_game():
+                        load_chapter_data()
+                        game_state = "playing"
+                        ai_text = "欢迎回来。"
+                        print(f"继续游戏：{CHAPTERS[current_chapter_index]['name']}")
+                else:
+                    # 新游戏
+                    delete_save()
+                    current_chapter_index = 0
+                    load_chapter_data()
+                    player_x, player_y = 1, 1
+                    intro_start_time = pygame.time.get_ticks()
+                    game_state = "intro"
+                    print("新游戏开始")
+            
         
         # 空格键触发AI对话（仅在游戏中状态）
         if event.type == pygame.KEYDOWN and game_state == "playing":
@@ -459,6 +550,7 @@ while running:
                 if 0 <= new_x < MAP_COLS and 0 <= new_y < MAP_ROWS:
                     if map_data[new_y][new_x] == 0:
                         player_x, player_y = new_x, new_y
+                        save_game()
                 last_move_time = current_time
 
     # --- 机械臂旋转控制（仅第四章且已激活） ---
@@ -633,6 +725,8 @@ while running:
             text_surface = font.render(line, True, (200, 220, 255))
             screen.blit(text_surface, (box_margin + 10, box_y + 10 + i * line_height))
 
+
+
     # --- 开场动画叠加层 ---
     if game_state == "intro":
         elapsed = pygame.time.get_ticks() - intro_start_time
@@ -720,6 +814,51 @@ while running:
             if elapsed >= 1000:
                 transition_state = "none"
                 print(f"进入 {CHAPTERS[current_chapter_index]['name']}")
+
+    # --- 启动菜单 ---
+    if game_state == "menu":
+        # 用纯黑覆盖整个屏幕
+        menu_overlay = pygame.Surface((WIDTH, HEIGHT))
+        menu_overlay.fill((5, 5, 15))
+        screen.blit(menu_overlay, (0, 0))
+        
+        # 标题
+        title_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 60)
+        title_surface = title_font.render("CodeCore", True, (0, 255, 200))
+        title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
+        screen.blit(title_surface, title_rect)
+        
+        # 副标题
+        sub_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
+        sub_surface = sub_font.render("按 ↑↓ 选择，Enter 确认", True, (100, 120, 150))
+        sub_rect = sub_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 100))
+        screen.blit(sub_surface, sub_rect)
+        
+        # 选项
+        option_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 32)
+        
+        # 继续游戏
+        if has_save():
+            color_continue = (200, 220, 255)
+        else:
+            color_continue = (60, 60, 70)
+        if menu_selection == 0:
+            continue_text = "▶ 继续游戏"
+        else:
+            continue_text = "  继续游戏"
+        continue_surface = option_font.render(continue_text, True, color_continue)
+        continue_rect = continue_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 10))
+        screen.blit(continue_surface, continue_rect)
+        
+        # 新游戏
+        color_new = (200, 220, 255)
+        if menu_selection == 1:
+            new_text = "▶ 新游戏"
+        else:
+            new_text = "  新游戏"
+        new_surface = option_font.render(new_text, True, color_new)
+        new_rect = new_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50))
+        screen.blit(new_surface, new_rect)
 
     pygame.display.flip()
     clock.tick(60)
