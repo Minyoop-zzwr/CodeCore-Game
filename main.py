@@ -696,6 +696,13 @@ while running:
     # 2. 绘制玩家（根据章节渲染模式）
     center_x = player_x * CELL_SIZE + CELL_SIZE // 2
     center_y = player_y * CELL_SIZE + CELL_SIZE // 2
+
+    # 玩家光晕（所有章节通用）
+    glow_surface = pygame.Surface((120, 120), pygame.SRCALPHA)
+    for r, alpha in [(55, 15), (45, 25), (35, 45), (25, 70)]:
+        pygame.draw.circle(glow_surface, (0, 255, 200, alpha), (60, 60), r)
+    screen.blit(glow_surface, (center_x - 60, center_y - 60))
+
     if render_mode == "binary":
         # 第一章：绿色 @ 符号
         player_surface = font.render("@", True, (0, 255, 0))
@@ -721,7 +728,6 @@ while running:
         # 绘制玩家
         pygame.draw.circle(screen, (255, 150, 50), (center_x, center_y), 20)
         pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)
-
     else:
         # 其他章节：发光圆球
         pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)
