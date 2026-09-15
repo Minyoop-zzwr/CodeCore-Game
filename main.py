@@ -281,13 +281,29 @@ def wrap_text(text, font, max_width):
     if current_line:
         lines.append(current_line)
     return lines
+def set_ai_text(text, animate=False):
+    """设置AI显示的文本。animate=True时使用打字机效果"""
+    global full_ai_text, ai_text, typewriter_start_time, typewriter_active
+    full_ai_text = text
+    if animate:
+        ai_text = ""
+        typewriter_start_time = pygame.time.get_ticks()
+        typewriter_active = True
+    else:
+        ai_text = text
+        typewriter_active = False
+
 # ---------- 游戏主循环 ----------
 running = True
 ai_text = "按 [空格键] 呼叫核心叙事者"
+full_ai_text = ai_text            # 完整的AI文本（打字机效果用）
+typewriter_start_time = 0         # 打字开始时间
+TYPEWRITER_SPEED = 40             # 每个字符的毫秒数（越小越快）
+typewriter_active = False         # 是否正在打字
 
 # ---------- 开场动画状态 ----------
-game_state = "menu"           # 状态：menu / intro / playing
-menu_selection = 0            # 菜单当前选中的选项（0=继续游戏，1=新游戏）
+game_state = "menu"           # 状态：menu / help / intro / playing
+menu_selection = 0            # 0=继续游戏，1=新游戏，2=玩法说明
 intro_start_time = pygame.time.get_ticks()  # 记录开场开始时间
 intro_duration = 6000         # 总时长 6 秒（单位：毫秒）
 
@@ -440,14 +456,22 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        # --- 启动菜单按键处理 ---
+         # --- 启动菜单按键处理 ---
         if event.type == pygame.KEYDOWN and game_state == "menu":
-            if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-                # 如果有存档，两个选项之间切换；没有存档，只能选"新游戏"
-                if has_save():
-                    menu_selection = 1 - menu_selection
-                else:
+            if event.key == pygame.K_UP:
+                menu_selection -= 1
+                if menu_selection < 0:
+                    menu_selection = 2
+                # 无存档时跳过"继续游戏"
+                if not has_save() and menu_selection == 0:
+                    menu_selection = 2
+            if event.key == pygame.K_DOWN:
+                menu_selection += 1
+                if menu_selection > 2:
                     menu_selection = 0
+                # 无存档时跳过"继续游戏"
+                if not has_save() and menu_selection == 0:
+                    menu_selection = 1
             if event.key == pygame.K_RETURN:
                 if menu_selection == 0 and has_save():
                     # 继续游戏
@@ -456,7 +480,7 @@ while running:
                         game_state = "playing"
                         ai_text = "欢迎回来。"
                         print(f"继续游戏：{CHAPTERS[current_chapter_index]['name']}")
-                else:
+                elif menu_selection == 1:
                     # 新游戏
                     delete_save()
                     current_chapter_index = 0
@@ -465,7 +489,16 @@ while running:
                     intro_start_time = pygame.time.get_ticks()
                     game_state = "intro"
                     print("新游戏开始")
-            
+                elif menu_selection == 2:
+                    # 玩法说明
+                    game_state = "help"
+                    print("查看玩法说明")
+
+        # --- 玩法说明页按键处理 ---
+        elif event.type == pygame.KEYDOWN and game_state == "help":
+            if event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
+                game_state = "menu"
+                print("返回菜单")           
         
         # 空格键触发AI对话（仅在游戏中状态）
         if event.type == pygame.KEYDOWN and game_state == "playing":
@@ -473,12 +506,13 @@ while running:
                 chapter = CHAPTERS[current_chapter_index]
                 if chapter["messages"] is not None:
                     import random
-                    ai_text = random.choice(chapter["messages"])
-                    print("电脑回应:", ai_text)
+                    msg = random.choice(chapter["messages"])
+                    set_ai_text(msg, animate=True)
+                    print("电脑回应:", msg)
                 else:
                     print("正在呼叫DeepSeek...")
                     reply = ask_local_model("我站在数字迷宫的中央，四周是冰冷的代码墙壁。请用一段连贯、富有文学性和激励性的文字描述此刻的氛围，并自然融入一句鼓励的话。请直接输出最终回答，字数控制在20字内，不要包含任何分析过程、推理、或额外注释。")
-                    ai_text = reply
+                    set_ai_text(reply, animate=True)
                     print("AI回应:", reply)
     
         # 第四章：站在控制台旁边按 Enter 激活机械臂
@@ -552,6 +586,13 @@ while running:
                         player_x, player_y = new_x, new_y
                         save_game()
                 last_move_time = current_time
+    # --- 打字机效果逐帧更新 ---
+    if typewriter_active:
+        elapsed = pygame.time.get_ticks() - typewriter_start_time
+        chars = min(len(full_ai_text), elapsed // TYPEWRITER_SPEED)
+        ai_text = full_ai_text[:chars]
+        if chars >= len(full_ai_text):
+            typewriter_active = False
 
     # --- 机械臂旋转控制（仅第四章且已激活） ---
     if game_state == "playing" and render_mode == "robot" and robot_mode_active:
@@ -817,24 +858,20 @@ while running:
 
     # --- 启动菜单 ---
     if game_state == "menu":
-        # 用纯黑覆盖整个屏幕
         menu_overlay = pygame.Surface((WIDTH, HEIGHT))
         menu_overlay.fill((5, 5, 15))
         screen.blit(menu_overlay, (0, 0))
         
-        # 标题
         title_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 60)
         title_surface = title_font.render("CodeCore", True, (0, 255, 200))
-        title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
+        title_rect = title_surface.get_rect(midleft=(100, HEIGHT // 2 - 100))
         screen.blit(title_surface, title_rect)
         
-        # 副标题
         sub_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
         sub_surface = sub_font.render("按 ↑↓ 选择，Enter 确认", True, (100, 120, 150))
-        sub_rect = sub_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 100))
+        sub_rect = sub_surface.get_rect(midleft=(100, HEIGHT // 2 + 150))
         screen.blit(sub_surface, sub_rect)
         
-        # 选项
         option_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 32)
         
         # 继续游戏
@@ -842,23 +879,65 @@ while running:
             color_continue = (200, 220, 255)
         else:
             color_continue = (60, 60, 70)
-        if menu_selection == 0:
-            continue_text = "▶ 继续游戏"
-        else:
-            continue_text = "  继续游戏"
+        continue_text = "▶ 继续游戏" if menu_selection == 0 else "  继续游戏"
         continue_surface = option_font.render(continue_text, True, color_continue)
-        continue_rect = continue_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 10))
+        continue_rect = continue_surface.get_rect(midleft=(100, HEIGHT // 2))
         screen.blit(continue_surface, continue_rect)
         
         # 新游戏
-        color_new = (200, 220, 255)
-        if menu_selection == 1:
-            new_text = "▶ 新游戏"
-        else:
-            new_text = "  新游戏"
+        color_new = (200, 220, 255) if menu_selection == 1 else (100, 100, 120)
+        new_text = "▶ 新游戏" if menu_selection == 1 else "  新游戏"
         new_surface = option_font.render(new_text, True, color_new)
-        new_rect = new_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50))
+        new_rect = new_surface.get_rect(midleft=(100, HEIGHT // 2 + 60))
         screen.blit(new_surface, new_rect)
+        
+        # 玩法说明
+        color_help = (200, 220, 255) if menu_selection == 2 else (100, 100, 120)
+        help_text = "▶ 玩法说明" if menu_selection == 2 else "  玩法说明"
+        help_surface = option_font.render(help_text, True, color_help)
+        help_rect = help_surface.get_rect(midleft=(100, HEIGHT // 2 + 120))
+        screen.blit(help_surface, help_rect)
+
+    # --- 玩法说明页 ---
+    if game_state == "help":
+        screen.fill((5, 5, 15))
+        
+        # 标题
+        h_title_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 40)
+        h_title = h_title_font.render("玩法说明", True, (0, 255, 200))
+        h_title_rect = h_title.get_rect(midleft=(80, 80))
+        screen.blit(h_title, h_title_rect)
+        
+        # 说明文字
+        h_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 22)
+        lines = [
+            "· 方向键移动，长按可持续移动。",
+            "· 第三四章用空格键呼叫 AI，它会说点什么。",
+            "· 走到右下角出口（设置为倒数第2列倒数第二行的格子），按 Enter 进入下一章。",
+            "",
+            "第一章：设计为原始的代码画面。",
+            "第二章：代码符号墙。",
+            "第三章：彩色迷宫并采用迷雾效果。",
+            "第四章：操控机械臂，把方块搬到目标点。",
+            "",
+            "每走一步自动存档。",
+        ]
+        for i, line in enumerate(lines):
+            line_surface = h_font.render(line, True, (180, 200, 220))
+            screen.blit(line_surface, (80, 160 + i * 36))
+
+        # 右下角感谢语
+        thanks_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
+        thanks_surface = thanks_font.render("感谢你玩我的游戏", True, (100, 150, 180))
+        thanks_rect = thanks_surface.get_rect(bottomright=(WIDTH - 40, HEIGHT - 30))
+        screen.blit(thanks_surface, thanks_rect)
+        
+        # 底部提示
+        tip_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 18)
+        tip = tip_font.render("按 Enter 或 Esc 返回菜单", True, (100, 120, 150))
+        tip_rect = tip.get_rect(center=(WIDTH // 2, HEIGHT - 60))
+        screen.blit(tip, tip_rect)
+
 
     pygame.display.flip()
     clock.tick(60)
