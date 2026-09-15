@@ -82,6 +82,8 @@ pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 small_code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 13)
+trail_history = []   # 玩家移动拖尾记录
+trail_idle_frames = 0    # 玩家停止移动的帧数
 # ---------- 代码雨（仅第一章） ----------
 code_rain = []
 for i in range(150):
@@ -604,6 +606,12 @@ while running:
         ai_text = full_ai_text[:chars]
         if chars >= len(full_ai_text):
             typewriter_active = False
+    else:
+        # 打字完成，末尾显示闪烁光标
+        if (pygame.time.get_ticks() // 500) % 2 == 0:
+            ai_text = full_ai_text + "_"
+        else:
+            ai_text = full_ai_text
 
     # --- 机械臂旋转控制（仅第四章且已激活） ---
     if game_state == "playing" and render_mode == "robot" and robot_mode_active:
@@ -718,6 +726,35 @@ while running:
     # 2. 绘制玩家（根据章节渲染模式）
     center_x = player_x * CELL_SIZE + CELL_SIZE // 2
     center_y = player_y * CELL_SIZE + CELL_SIZE // 2
+
+    # 玩家拖尾（连续渐变条 + 静止淡出）
+    if len(trail_history) == 0 or trail_history[-1] != (player_x, player_y):
+        # 玩家移动了：追加位置，重置空闲计数
+        trail_history.append((player_x, player_y))
+        if len(trail_history) > 12:
+            trail_history.pop(0)
+        trail_idle_frames = 0
+    else:
+        # 玩家静止：延迟一段时间后逐渐缩短拖尾
+        trail_idle_frames += 1
+        if trail_idle_frames > 5 and len(trail_history) > 0:
+            if trail_idle_frames % 2 == 0:
+                trail_history.pop(0)
+    if len(trail_history) > 1:
+        trail_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        n = len(trail_history)
+        for i in range(n - 1):
+            x1, y1 = trail_history[i]
+            x2, y2 = trail_history[i + 1]
+            cx1 = x1 * CELL_SIZE + CELL_SIZE // 2
+            cy1 = y1 * CELL_SIZE + CELL_SIZE // 2
+            cx2 = x2 * CELL_SIZE + CELL_SIZE // 2
+            cy2 = y2 * CELL_SIZE + CELL_SIZE // 2
+            ratio = i / (n - 1)
+            alpha = int(160 * ratio)
+            width = max(2, int(14 * ratio))
+            pygame.draw.line(trail_layer, (0, 255, 200, alpha), (cx1, cy1), (cx2, cy2), width)
+        screen.blit(trail_layer, (0, 0))
 
     # 玩家光晕（所有章节通用）
     glow_surface = pygame.Surface((120, 120), pygame.SRCALPHA)
@@ -834,13 +871,25 @@ while running:
             else:
                 text_alpha = max(0, 255 - int((elapsed - 3000) / 3000 * 255))
             
-            # 显示章节标题
+            # 显示章节标题（带故障抖动）
             if text_alpha > 0:
                 intro_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 36)
                 title_surface = intro_font.render("CHAPTER 1: DESCEND", True, (150, 150, 150))
                 title_surface.set_alpha(text_alpha)
                 title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-                screen.blit(title_surface, title_rect)
+                # 故障抖动：随机偏移
+                if random.random() < 0.15:
+                    jitter_x = random.randint(-4, 4)
+                    jitter_y = random.randint(-2, 2)
+                else:
+                    jitter_x = jitter_y = 0
+                # 红色重影（故障感）
+                if random.random() < 0.1:
+                    ghost = intro_font.render("CHAPTER 1: DESCEND", True, (255, 60, 60))
+                    ghost.set_alpha(text_alpha // 2)
+                    ghost_rect = ghost.get_rect(center=(WIDTH // 2 + 3, HEIGHT // 2))
+                    screen.blit(ghost, ghost_rect)
+                screen.blit(title_surface, (title_rect.x + jitter_x, title_rect.y + jitter_y))
 
     # --- 章节过渡动画 ---
     if transition_state != "none":
@@ -882,7 +931,13 @@ while running:
             chapter_name = CHAPTERS[current_chapter_index]["name"]
             title_surface = title_font.render(chapter_name, True, (150, 150, 150))
             title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            screen.blit(title_surface, title_rect)
+            # 故障抖动
+            if random.random() < 0.15:
+                jitter_x = random.randint(-4, 4)
+                jitter_y = random.randint(-2, 2)
+            else:
+                jitter_x = jitter_y = 0
+            screen.blit(title_surface, (title_rect.x + jitter_x, title_rect.y + jitter_y))
             if elapsed >= 2000:
                 transition_state = "fading_in"
                 transition_start_time = pygame.time.get_ticks()
