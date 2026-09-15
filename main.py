@@ -80,6 +80,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
+small_code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 13)
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
 # ---------- 章节配置 ----------
 CHAPTERS = [
@@ -617,20 +618,31 @@ while running:
             x = col * CELL_SIZE
             y = row * CELL_SIZE
             if render_mode == "binary":
-                # 第一章：二进制字符渲染
+                # 第一章：黑客帝国风格，绿色密集字符
                 if map_data[row][col] == 1:
-                    char_surface = font.render("1", True, (220, 220, 220))
+                    color = (0, 255, 0)
+                    char = "1"
                 else:
-                    char_surface = font.render("0", True, (50, 50, 70))
-                char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
-                screen.blit(char_surface, char_rect)
+                    color = (0, 70, 0)
+                    char = "0"
+                for dx in [0, 1]:
+                    for dy in [0, 1]:
+                        cx = x + (dx + 0.5) * (CELL_SIZE // 2)
+                        cy = y + (dy + 0.5) * (CELL_SIZE // 2)
+                        char_surface = small_code_font.render(char, True, color)
+                        char_rect = char_surface.get_rect(center=(cx, cy))
+                        screen.blit(char_surface, char_rect)
             elif render_mode == "ascii":
-                # 第二章：直接渲染地图字符
+                # 第二章：密集符号阵列
                 if map_data[row][col] == 1:
                     char = maze_template[row][col]
-                    char_surface = font.render(char, True, (80, 200, 200))
-                    char_rect = char_surface.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
-                    screen.blit(char_surface, char_rect)
+                    for dx in [0, 1]:
+                        for dy in [0, 1]:
+                            cx = x + (dx + 0.5) * (CELL_SIZE // 2)
+                            cy = y + (dy + 0.5) * (CELL_SIZE // 2)
+                            char_surface = small_code_font.render(char, True, (80, 200, 200))
+                            char_rect = char_surface.get_rect(center=(cx, cy))
+                            screen.blit(char_surface, char_rect)
             elif render_mode == "gradient":
                 # 第三章：彩色渐变渲染
                 if map_data[row][col] == 1:
