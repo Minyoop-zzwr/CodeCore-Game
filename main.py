@@ -361,12 +361,14 @@ gripper_open = 0
 robot_mode_active = False
 
 # ---------- 第四章：方块与目标位置 ----------
-block_col = 18       # 方块初始列
-block_row = 14       # 方块初始行
 block_size = 20      # 方块像素大小
-target_col = 26      # 目标位置列
-target_row = 10      # 目标位置行
-is_carrying = False  # 是否正在抓取方块
+blocks = [
+    {"col": 18, "row": 14, "color": (220, 180, 60),  "tx": 26, "ty": 10, "placed": False},
+    {"col": 22, "row": 16, "color": (100, 180, 255), "tx": 24, "ty": 6,  "placed": False},
+    {"col": 14, "row": 12, "color": (255, 100, 180), "tx": 28, "ty": 14, "placed": False},
+]
+carrying_index = -1  # -1=没抓着，其他值=抓着第几个方块
+
 # ---------- 第四章：门 ----------
 door_open = False
 door_col = 4
@@ -429,50 +431,59 @@ def draw_robot_arm():
         pygame.draw.line(screen, (220, 220, 230), (tip_x, tip_y), (gx, gy), 4)
 
 def draw_block():
-    """绘制方块（如果被抓取，跟随机械臂末端）"""
-    if is_carrying:
-        # 跟随机械臂末端
-        base_x = arm_base_col * CELL_SIZE + CELL_SIZE // 2
-        base_y = arm_base_row * CELL_SIZE + CELL_SIZE // 2
-        rad1 = math.radians(arm_angle1)
-        rad2 = math.radians(arm_angle1 + arm_angle2)
-        rad3 = math.radians(arm_angle1 + arm_angle2 + arm_angle3)
-        elbow_x = base_x + ARM1_LENGTH * math.sin(rad1)
-        elbow_y = base_y - ARM1_LENGTH * math.cos(rad1)
-        wrist_x = elbow_x + ARM2_LENGTH * math.sin(rad2)
-        wrist_y = elbow_y - ARM2_LENGTH * math.cos(rad2)
-        tip_x = wrist_x + ARM3_LENGTH * math.sin(rad3)
-        tip_y = wrist_y - ARM3_LENGTH * math.cos(rad3)
-        bx = tip_x - block_size // 2
-        by = tip_y - block_size // 2
-    else:
-        # 固定在初始位置
-        bx = block_col * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
-        by = block_row * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+    """绘制所有方块（被抓起的那一个跟随机械臂末端）"""
+    base_x = arm_base_col * CELL_SIZE + CELL_SIZE // 2
+    base_y = arm_base_row * CELL_SIZE + CELL_SIZE // 2
+    rad1 = math.radians(arm_angle1)
+    rad2 = math.radians(arm_angle1 + arm_angle2)
+    rad3 = math.radians(arm_angle1 + arm_angle2 + arm_angle3)
+    elbow_x = base_x + ARM1_LENGTH * math.sin(rad1)
+    elbow_y = base_y - ARM1_LENGTH * math.cos(rad1)
+    wrist_x = elbow_x + ARM2_LENGTH * math.sin(rad2)
+    wrist_y = elbow_y - ARM2_LENGTH * math.cos(rad2)
+    tip_x = wrist_x + ARM3_LENGTH * math.sin(rad3)
+    tip_y = wrist_y - ARM3_LENGTH * math.cos(rad3)
     
-    pygame.draw.rect(screen, (220, 180, 60), (bx, by, block_size, block_size))
-    pygame.draw.rect(screen, (255, 220, 120), (bx, by, block_size, block_size), 2)
-
+    for i, b in enumerate(blocks):
+        if b["placed"]:
+            # 已放置，固定显示在目标位置
+            bx = b["tx"] * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+            by = b["ty"] * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+        elif i == carrying_index:
+            # 被抓起，跟随机械臂末端
+            bx = tip_x - block_size // 2
+            by = tip_y - block_size // 2
+        else:
+            # 固定在初始位置
+            bx = b["col"] * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+            by = b["row"] * CELL_SIZE + CELL_SIZE // 2 - block_size // 2
+        
+        # 主色
+        pygame.draw.rect(screen, b["color"], (bx, by, block_size, block_size))
+        # 亮色边框
+        bright = tuple(min(255, c + 50) for c in b["color"])
+        pygame.draw.rect(screen, bright, (bx, by, block_size, block_size), 2)
 
 def draw_target():
-    """绘制目标位置（虚线框）"""
-    tx = target_col * CELL_SIZE
-    ty = target_row * CELL_SIZE
-    # 用四条短线段画虚线框
+    """绘制三个目标位置（颜色与对应方块相同）"""
     dash_len = 6
     gap_len = 4
-    color = (80, 255, 120)
-    # 上下边
-    for x in range(tx, tx + CELL_SIZE, dash_len + gap_len):
-        end = min(x + dash_len, tx + CELL_SIZE)
-        pygame.draw.line(screen, color, (x, ty), (end, ty), 2)
-        pygame.draw.line(screen, color, (x, ty + CELL_SIZE), (end, ty + CELL_SIZE), 2)
-    # 左右边
-    for y in range(ty, ty + CELL_SIZE, dash_len + gap_len):
-        end = min(y + dash_len, ty + CELL_SIZE)
-        pygame.draw.line(screen, color, (tx, y), (tx, end), 2)
-        pygame.draw.line(screen, color, (tx + CELL_SIZE, y), (tx + CELL_SIZE, end), 2)
-
+    for b in blocks:
+        if b["placed"]:
+            continue
+        tx = b["tx"] * CELL_SIZE
+        ty = b["ty"] * CELL_SIZE
+        color = b["color"]
+        # 上下边
+        for x in range(tx, tx + CELL_SIZE, dash_len + gap_len):
+            end = min(x + dash_len, tx + CELL_SIZE)
+            pygame.draw.line(screen, color, (x, ty), (end, ty), 2)
+            pygame.draw.line(screen, color, (x, ty + CELL_SIZE), (end, ty + CELL_SIZE), 2)
+        # 左右边
+        for y in range(ty, ty + CELL_SIZE, dash_len + gap_len):
+            end = min(y + dash_len, ty + CELL_SIZE)
+            pygame.draw.line(screen, color, (tx, y), (tx, end), 2)
+            pygame.draw.line(screen, color, (tx + CELL_SIZE, y), (tx + CELL_SIZE, end), 2)
 
 while running:
         
@@ -503,12 +514,16 @@ while running:
                     if load_game():
                         load_chapter_data()
                         game_state = "playing"
-                        ai_text = "欢迎回来。"
+                        robot_mode_active = False
+                        carrying_index = -1
+                        set_ai_text("欢迎回来。", animate=False)             
                         print(f"继续游戏：{CHAPTERS[current_chapter_index]['name']}")
                 elif menu_selection == 1:
                     # 新游戏
                     delete_save()
                     explored_cells.clear()
+                    robot_mode_active = False
+                    carrying_index = -1
                     current_chapter_index = 0
                     load_chapter_data()
                     player_x, player_y = 1, 1
@@ -532,26 +547,37 @@ while running:
                 pause_menu_active = True
                 pause_selection = 0
                 print("暂停菜单已打开")
-
-        # 暂停菜单按键处理
-        if event.type == pygame.KEYDOWN and pause_menu_active:
-            if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-                pause_selection = 1 - pause_selection
-            if event.key == pygame.K_RETURN:
-                if pause_selection == 0:
-                    # 确认退出
+        # 暂停菜单：鼠标悬停 + 点击
+        elif pause_menu_active:
+            # 计算两个按钮的位置
+            btn_w, btn_h = 120, 50
+            confirm_rect = pygame.Rect(WIDTH // 2 - 140, HEIGHT // 2 + 10, btn_w, btn_h)
+            cancel_rect = pygame.Rect(WIDTH // 2 + 20, HEIGHT // 2 + 10, btn_w, btn_h)
+            
+            # 鼠标移动：检测悬停
+            if event.type == pygame.MOUSEMOTION:
+                mx, my = event.pos
+                if confirm_rect.collidepoint(mx, my):
+                    pause_selection = 0
+                elif cancel_rect.collidepoint(mx, my):
+                    pause_selection = 1
+            
+            # 鼠标点击：执行选项
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                if confirm_rect.collidepoint(mx, my):
                     pause_menu_active = False
                     game_state = "menu"
                     menu_selection = 0
                     print("返回主菜单")
-                else:
-                    # 取消
+                elif cancel_rect.collidepoint(mx, my):
                     pause_menu_active = False
                     print("取消退出")
-            if event.key == pygame.K_ESCAPE:
-                # 再按 ESC 也取消
+            
+            # ESC 仍可取消
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 pause_menu_active = False
-
+                print("取消退出")
         # 空格键触发AI对话（仅在游戏中状态）
         if event.type == pygame.KEYDOWN and game_state == "playing":
             if event.key == pygame.K_SPACE:
@@ -572,38 +598,55 @@ while running:
             if event.key == pygame.K_RETURN and not robot_mode_active:
                 if player_y == 4 and 2 <= player_x <= 6:
                     robot_mode_active = True
-                    ai_text = "机械臂已激活，使用 Q/E 控制大臂，A/D 控制小臂，Z/C 控制腕关节"
+                    set_ai_text("机械臂已激活，先按下shift，再使用 Q/E 控制大臂，A/D 控制小臂，Z/C 控制腕关节", animate=True)
                     print("机械臂已激活")
 
         # 第四章：按 F 键抓取/释放方块
         if event.type == pygame.KEYDOWN and game_state == "playing" and render_mode == "robot" and robot_mode_active:
             if event.key == pygame.K_f:
                 tip_x, tip_y = get_tip_position()
-                if is_carrying:
-                    # 释放方块
+                if carrying_index >= 0:
+                    # 释放当前抓着的方块
                     new_col = int(tip_x // CELL_SIZE)
                     new_row = int(tip_y // CELL_SIZE)
                     if 1 <= new_col < MAP_COLS - 1 and 1 <= new_row < MAP_ROWS - 1:
                         if map_data[new_row][new_col] != 1:
-                            is_carrying = False
-                            block_col = new_col
-                            block_row = new_row
-                            ai_text = "方块已放置"
-                            print("方块已放置")
-                            if block_col == target_col and block_row == target_row:
-                                ai_text = "任务完成！方块已到达目标位置。"
+                            b = blocks[carrying_index]
+                            b["col"] = new_col
+                            b["row"] = new_row
+                            # 判定是否放进目标位置
+                            if abs(new_col - b["tx"]) <= 1 and abs(new_row - b["ty"]) <= 1:
+                                b["col"] = b["tx"]
+                                b["row"] = b["ty"]
+                                b["placed"] = True
+                                set_ai_text(f"方块 {carrying_index+1} 已放置到目标位置", animate=True)
+                                print(f"方块 {carrying_index+1} 已放置到目标位置")
+                            else:
+                                set_ai_text("方块已放下", animate=True)
+                            carrying_index = -1
+                            # 检查是否所有方块都放置完成
+                            if all(bb["placed"] for bb in blocks):
+                                set_ai_text("任务完成！所有方块已到达目标位置。", animate=True)
                                 print("第四章任务完成！")
                                 door_open = True
                                 map_data[door_row][door_col] = 0
                 else:
-                    # 尝试抓取
-                    block_center_x = block_col * CELL_SIZE + CELL_SIZE // 2
-                    block_center_y = block_row * CELL_SIZE + CELL_SIZE // 2
-                    dist = math.sqrt((tip_x - block_center_x) ** 2 + (tip_y - block_center_y) ** 2)
-                    if dist < CELL_SIZE:
-                        is_carrying = True
-                        ai_text = "方块已抓取"
-                        print("方块已抓取")
+                    # 尝试抓取最近的方块
+                    nearest = -1
+                    nearest_dist = CELL_SIZE * 1.2
+                    for i, b in enumerate(blocks):
+                        if b["placed"]:
+                            continue
+                        bx = b["col"] * CELL_SIZE + CELL_SIZE // 2
+                        by = b["row"] * CELL_SIZE + CELL_SIZE // 2
+                        d = math.sqrt((tip_x - bx) ** 2 + (tip_y - by) ** 2)
+                        if d < nearest_dist:
+                            nearest_dist = d
+                            nearest = i
+                    if nearest >= 0:
+                        carrying_index = nearest
+                        set_ai_text(f"已抓取方块 {nearest+1}", animate=True)
+                        print(f"已抓取方块 {nearest+1}")
 
         # 在出口处按 Enter 键触发章节过渡
         if event.type == pygame.KEYDOWN and game_state == "playing" and transition_state == "none":
@@ -908,6 +951,20 @@ while running:
         for i, line in enumerate(lines[:5]):
             text_surface = code_font.render(line, True, (0, 255, 255))
             screen.blit(text_surface, (box_margin + 10, box_y + 8 + (i + 1) * line_height))
+    elif render_mode == "robot":
+        # 第四章：机械工程风格（橙色边框 + 深色背景）
+        pygame.draw.rect(screen, (15, 15, 20), box_rect)
+        pygame.draw.rect(screen, (255, 150, 50), box_rect, 2)
+        # 回复人标签
+        label = font.render("> system:", True, (255, 150, 50))
+        screen.blit(label, (box_margin + 10, box_y + 8))
+        # 文本内容
+        max_text_width = box_width - 20
+        lines = wrap_text(ai_text, font, max_text_width)
+        line_height = font.get_linesize()
+        for i, line in enumerate(lines[:4]):
+            text_surface = font.render(line, True, (220, 200, 180))
+            screen.blit(text_surface, (box_margin + 10, box_y + 8 + (i + 1) * line_height))
     else:
         # 第三章及其他：深色半透明风格
         box_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
@@ -998,7 +1055,9 @@ while running:
                 else:
                     map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
                 player_x, player_y = 1, 1
-                ai_text = "按 [空格键] 呼叫核心叙事者"
+                robot_mode_active = False
+                carrying_index = -1
+                set_ai_text("按 [空格键] 呼叫核心叙事者", animate=False)
                 transition_state = "title"
                 transition_start_time = pygame.time.get_ticks()
         
@@ -1085,14 +1144,15 @@ while running:
         # 说明文字
         h_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 22)
         lines = [
+            "· 玩家控制的单位，作者把他认定为“explorer”。",
             "· 方向键移动，长按可持续移动。",
-            "· 第三四章用空格键呼叫 AI，它会说点什么。",
+            "· 第三四章用空格键呼叫 AI，它会说点什么(还没想好该说什么（bushi）)。",
             "· 走到右下角出口（设置为倒数第2列倒数第二行的格子），按 Enter 进入下一章。",
             "",
-            "第一章：设计为原始的代码画面。",
-            "第二章：代码符号墙。",
+            "第一章：简陋的地图，你只需要走到左下角。",
+            "第二章：代码符号墙，和图一一样。",
             "第三章：彩色迷宫并采用迷雾效果。",
-            "第四章：操控机械臂，把方块搬到目标点。",
+            "第四章：操控机械臂，把方块搬到目标点，打开暗格。",
             "",
             "每走一步自动存档。",
         ]
@@ -1100,11 +1160,15 @@ while running:
             line_surface = h_font.render(line, True, (180, 200, 220))
             screen.blit(line_surface, (80, 160 + i * 36))
 
-        # 右下角感谢语
+        # 右下角感谢语（两行）
         thanks_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
-        thanks_surface = thanks_font.render("感谢你玩我的游戏", True, (100, 150, 180))
-        thanks_rect = thanks_surface.get_rect(bottomright=(WIDTH - 40, HEIGHT - 30))
-        screen.blit(thanks_surface, thanks_rect)
+        thanks_line1 = thanks_font.render("感谢玩我的游戏", True, (100, 150, 180))
+        thanks_line1_rect = thanks_line1.get_rect(bottomright=(WIDTH - 40, HEIGHT - 60))
+        screen.blit(thanks_line1, thanks_line1_rect)
+        
+        thanks_line2 = thanks_font.render("——Minyoop", True, (100, 150, 180))
+        thanks_line2_rect = thanks_line2.get_rect(bottomright=(WIDTH - 40, HEIGHT - 30))
+        screen.blit(thanks_line2, thanks_line2_rect)
         
         # 底部提示
         tip_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 18)
@@ -1126,7 +1190,7 @@ while running:
         screen.blit(pause_overlay, (0, 0))
         
         # 弹出框
-        box_w, box_h = 400, 200
+        box_w, box_h = 400, 220
         box_x = (WIDTH - box_w) // 2
         box_y = (HEIGHT - box_h) // 2
         pygame.draw.rect(screen, (20, 25, 40), (box_x, box_y, box_w, box_h))
@@ -1138,18 +1202,36 @@ while running:
         prompt_rect = prompt.get_rect(center=(WIDTH // 2, box_y + 60))
         screen.blit(prompt, prompt_rect)
         
-        # 选项
-        opt_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 24)
-        confirm_text = "▶ 确认" if pause_selection == 0 else "  确认"
-        cancel_text = "▶ 取消" if pause_selection == 1 else "  取消"
+        # 按钮位置（和事件处理保持一致）
+        btn_w, btn_h = 120, 50
+        confirm_rect = pygame.Rect(WIDTH // 2 - 140, HEIGHT // 2 + 10, btn_w, btn_h)
+        cancel_rect = pygame.Rect(WIDTH // 2 + 20, HEIGHT // 2 + 10, btn_w, btn_h)
         
-        confirm_surface = opt_font.render(confirm_text, True, (200, 220, 255) if pause_selection == 0 else (100, 100, 120))
-        confirm_rect = confirm_surface.get_rect(center=(WIDTH // 2 - 80, box_y + 130))
-        screen.blit(confirm_surface, confirm_rect)
+        # 确认按钮
+        if pause_selection == 0:
+            pygame.draw.rect(screen, (0, 200, 120), confirm_rect)
+            pygame.draw.rect(screen, (0, 255, 180), confirm_rect, 2)
+            confirm_color = (255, 255, 255)
+        else:
+            pygame.draw.rect(screen, (40, 50, 70), confirm_rect)
+            pygame.draw.rect(screen, (80, 100, 120), confirm_rect, 2)
+            confirm_color = (160, 180, 200)
+        confirm_text = pause_font.render("确认", True, confirm_color)
+        confirm_text_rect = confirm_text.get_rect(center=confirm_rect.center)
+        screen.blit(confirm_text, confirm_text_rect)
         
-        cancel_surface = opt_font.render(cancel_text, True, (200, 220, 255) if pause_selection == 1 else (100, 100, 120))
-        cancel_rect = cancel_surface.get_rect(center=(WIDTH // 2 + 80, box_y + 130))
-        screen.blit(cancel_surface, cancel_rect)
+        # 取消按钮
+        if pause_selection == 1:
+            pygame.draw.rect(screen, (0, 200, 120), cancel_rect)
+            pygame.draw.rect(screen, (0, 255, 180), cancel_rect, 2)
+            cancel_color = (255, 255, 255)
+        else:
+            pygame.draw.rect(screen, (40, 50, 70), cancel_rect)
+            pygame.draw.rect(screen, (80, 100, 120), cancel_rect, 2)
+            cancel_color = (160, 180, 200)
+        cancel_text = pause_font.render("取消", True, cancel_color)
+        cancel_text_rect = cancel_text.get_rect(center=cancel_rect.center)
+        screen.blit(cancel_text, cancel_text_rect)
 
     pygame.display.flip()
     clock.tick(60)
