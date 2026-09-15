@@ -5,6 +5,7 @@ import json
 import re
 import math
 import os
+import random
 
 def load_chapter_data():
     """根据 current_chapter_index 重新加载地图数据"""
@@ -81,6 +82,15 @@ pygame.display.set_caption("代码之核 - 内存迷宫")
 clock = pygame.time.Clock()
 font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 small_code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 13)
+# ---------- 代码雨（仅第一章） ----------
+code_rain = []
+for i in range(150):
+    code_rain.append({
+        "x": random.randint(0, WIDTH),
+        "y": random.randint(-HEIGHT, 0),
+        "speed": random.uniform(0.8, 2.5),
+        "char": random.choice("01"),
+    })
 # ---------- 地图数据 (0=空地, 1=墙壁) ----------
 # ---------- 章节配置 ----------
 CHAPTERS = [
@@ -611,6 +621,18 @@ while running:
 
     # --- 绘制画面 ---
     screen.fill((10, 10, 30))  # 深空底色
+    # 代码雨背景（仅第一章）
+    if CHAPTERS[current_chapter_index]["render_mode"] == "binary":
+        for drop in code_rain:
+            ...
+        for drop in code_rain:
+            drop["y"] += drop["speed"]
+            if drop["y"] > HEIGHT:
+                drop["y"] = -20
+                drop["x"] = random.randint(0, WIDTH)
+                drop["char"] = random.choice("01")
+            rain_surface = small_code_font.render(drop["char"], True, (0, 90, 0))
+            screen.blit(rain_surface, (drop["x"], drop["y"]))
     # 1. 绘制地图（根据章节渲染模式）
     render_mode = CHAPTERS[current_chapter_index]["render_mode"]
     for row in range(MAP_ROWS):
@@ -956,6 +978,11 @@ while running:
         tip_rect = tip.get_rect(center=(WIDTH // 2, HEIGHT - 60))
         screen.blit(tip, tip_rect)
 
+    # --- 扫描线滤镜（CRT复古效果） ---
+    scanline_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    for y in range(0, HEIGHT, 4):
+        pygame.draw.line(scanline_surface, (0, 0, 0, 100), (0, y), (WIDTH, y))
+    screen.blit(scanline_surface, (0, 0))
 
     pygame.display.flip()
     clock.tick(60)
