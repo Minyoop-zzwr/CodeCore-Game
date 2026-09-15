@@ -85,6 +85,7 @@ small_code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 13)
 trail_history = []   # 玩家移动拖尾记录
 trail_idle_frames = 0    # 玩家停止移动的帧数
 collected_items = []   # 已收集的碎片位置列表
+explored_cells = set()   # 第三章：已探索的格子坐标
 # ---------- 代码雨（仅第一章） ----------
 code_rain = []
 for i in range(150):
@@ -505,6 +506,7 @@ while running:
                 elif menu_selection == 1:
                     # 新游戏
                     delete_save()
+                    explored_cells.clear()
                     current_chapter_index = 0
                     load_chapter_data()
                     player_x, player_y = 1, 1
@@ -607,6 +609,13 @@ while running:
                     if map_data[new_y][new_x] == 0:
                         player_x, player_y = new_x, new_y
                         save_game()
+                        # 第三章：标记周围 5x5 区域为已探索
+                        if CHAPTERS[current_chapter_index]["fog_enabled"]:
+                            for dy in range(-2, 3):
+                                for dx in range(-2, 3):
+                                    ex, ey = player_x + dx, player_y + dy
+                                    if 0 <= ex < MAP_COLS and 0 <= ey < MAP_ROWS:
+                                        explored_cells.add((ex, ey))
                         # 第二章：检测是否踩到数据碎片
                         collectibles = CHAPTERS[current_chapter_index].get("collectibles", [])
                         collect_msgs = CHAPTERS[current_chapter_index].get("collect_messages", [])
@@ -747,11 +756,16 @@ while running:
                 cell_center_y = row * CELL_SIZE + CELL_SIZE // 2
                 dist = math.sqrt((cell_center_x - player_center_x) ** 2 + (cell_center_y - player_center_y) ** 2) / CELL_SIZE
                 if dist > 5.0:
-                    alpha = 255
+                    base_alpha = 255
                 else:
-                    alpha = int((dist / 5.0) * 255)
+                    base_alpha = int((dist / 5.0) * 255)
+                # 已探索区域大幅降低遮罩，只保留一点点暗色调
+                if (col, row) in explored_cells:
+                    alpha = int(base_alpha * 0.15)
+                else:
+                    alpha = base_alpha
                 pygame.draw.rect(map_surface, (30, 30, 30, alpha), (col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE))
-        screen.blit(map_surface, (0, 0))    
+        screen.blit(map_surface, (0, 0))
     # 2. 绘制玩家（根据章节渲染模式）
     center_x = player_x * CELL_SIZE + CELL_SIZE // 2
     center_y = player_y * CELL_SIZE + CELL_SIZE // 2
