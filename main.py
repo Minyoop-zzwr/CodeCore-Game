@@ -86,6 +86,8 @@ trail_history = []   # 玩家移动拖尾记录
 trail_idle_frames = 0    # 玩家停止移动的帧数
 collected_items = []   # 已收集的碎片位置列表
 explored_cells = set()   # 第三章：已探索的格子坐标
+pause_menu_active = False   # 是否显示暂停菜单
+pause_selection = 0         # 0=确认退出，1=取消
 # ---------- 代码雨（仅第一章） ----------
 code_rain = []
 for i in range(150):
@@ -524,6 +526,32 @@ while running:
                 game_state = "menu"
                 print("返回菜单")           
         
+        # 游戏中按 ESC 弹出退出确认框
+        if event.type == pygame.KEYDOWN and game_state == "playing" and transition_state == "none":
+            if event.key == pygame.K_ESCAPE and not pause_menu_active:
+                pause_menu_active = True
+                pause_selection = 0
+                print("暂停菜单已打开")
+
+        # 暂停菜单按键处理
+        if event.type == pygame.KEYDOWN and pause_menu_active:
+            if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
+                pause_selection = 1 - pause_selection
+            if event.key == pygame.K_RETURN:
+                if pause_selection == 0:
+                    # 确认退出
+                    pause_menu_active = False
+                    game_state = "menu"
+                    menu_selection = 0
+                    print("返回主菜单")
+                else:
+                    # 取消
+                    pause_menu_active = False
+                    print("取消退出")
+            if event.key == pygame.K_ESCAPE:
+                # 再按 ESC 也取消
+                pause_menu_active = False
+
         # 空格键触发AI对话（仅在游戏中状态）
         if event.type == pygame.KEYDOWN and game_state == "playing":
             if event.key == pygame.K_SPACE:
@@ -592,7 +620,7 @@ while running:
                         print("已完成所有章节")
 
     # --- 长按持续移动 ---
-    if game_state == "playing" and transition_state == "none":
+    if game_state == "playing" and transition_state == "none" and not pause_menu_active:
         keys = pygame.key.get_pressed()
         current_time = pygame.time.get_ticks()
         current_cooldown = CHAPTERS[current_chapter_index].get("move_cooldown", 150)
@@ -642,7 +670,7 @@ while running:
             ai_text = full_ai_text
 
     # --- 机械臂旋转控制（仅第四章且已激活） ---
-    if game_state == "playing" and render_mode == "robot" and robot_mode_active:
+    if game_state == "playing" and render_mode == "robot" and robot_mode_active and not pause_menu_active:
         keys = pygame.key.get_pressed()
         current_time = pygame.time.get_ticks()
         if current_time - last_arm_move_time > ARM_COOLDOWN:
@@ -1089,6 +1117,39 @@ while running:
     for y in range(0, HEIGHT, 4):
         pygame.draw.line(scanline_surface, (0, 0, 0, 100), (0, y), (WIDTH, y))
     screen.blit(scanline_surface, (0, 0))
+
+    # --- 暂停菜单 ---
+    if pause_menu_active:
+        # 半透明黑色遮罩
+        pause_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pause_overlay.fill((0, 0, 0, 180))
+        screen.blit(pause_overlay, (0, 0))
+        
+        # 弹出框
+        box_w, box_h = 400, 200
+        box_x = (WIDTH - box_w) // 2
+        box_y = (HEIGHT - box_h) // 2
+        pygame.draw.rect(screen, (20, 25, 40), (box_x, box_y, box_w, box_h))
+        pygame.draw.rect(screen, (0, 200, 150), (box_x, box_y, box_w, box_h), 2)
+        
+        # 提示文字
+        pause_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 26)
+        prompt = pause_font.render("是否确认退出？", True, (200, 220, 255))
+        prompt_rect = prompt.get_rect(center=(WIDTH // 2, box_y + 60))
+        screen.blit(prompt, prompt_rect)
+        
+        # 选项
+        opt_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 24)
+        confirm_text = "▶ 确认" if pause_selection == 0 else "  确认"
+        cancel_text = "▶ 取消" if pause_selection == 1 else "  取消"
+        
+        confirm_surface = opt_font.render(confirm_text, True, (200, 220, 255) if pause_selection == 0 else (100, 100, 120))
+        confirm_rect = confirm_surface.get_rect(center=(WIDTH // 2 - 80, box_y + 130))
+        screen.blit(confirm_surface, confirm_rect)
+        
+        cancel_surface = opt_font.render(cancel_text, True, (200, 220, 255) if pause_selection == 1 else (100, 100, 120))
+        cancel_rect = cancel_surface.get_rect(center=(WIDTH // 2 + 80, box_y + 130))
+        screen.blit(cancel_surface, cancel_rect)
 
     pygame.display.flip()
     clock.tick(60)
