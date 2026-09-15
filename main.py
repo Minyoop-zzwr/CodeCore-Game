@@ -84,6 +84,7 @@ font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 20)
 small_code_font = pygame.font.Font("C:/Windows/Fonts/consola.ttf", 13)
 trail_history = []   # 玩家移动拖尾记录
 trail_idle_frames = 0    # 玩家停止移动的帧数
+collected_items = []   # 已收集的碎片位置列表
 # ---------- 代码雨（仅第一章） ----------
 code_rain = []
 for i in range(150):
@@ -161,6 +162,14 @@ CHAPTERS = [
             'print("I am learning...")',
             'print("Syntax acquired")',
             'print("Code is my language")'
+        ],
+        "collectibles": [(6, 1), (18, 1), (28, 1), (10, 9), (20, 15)],
+        "collect_messages": [
+            "碎片已回收。数据完整度 +20%。",
+            "检测到旧代码片段...包含未知指令。",
+            "记忆模块部分恢复。继续收集。",
+            "加密数据已解密：这是你丢失的记忆。",
+            "全部碎片已收集。核心将在下一章苏醒。",
         ],
         "render_mode": "ascii",
         "fog_enabled": False,
@@ -598,6 +607,16 @@ while running:
                     if map_data[new_y][new_x] == 0:
                         player_x, player_y = new_x, new_y
                         save_game()
+                        # 第二章：检测是否踩到数据碎片
+                        collectibles = CHAPTERS[current_chapter_index].get("collectibles", [])
+                        collect_msgs = CHAPTERS[current_chapter_index].get("collect_messages", [])
+                        for ci, (ccol, crow) in enumerate(collectibles):
+                            if (ccol, crow) == (player_x, player_y) and (ccol, crow) not in collected_items:
+                                collected_items.append((ccol, crow))
+                                if ci < len(collect_msgs):
+                                    set_ai_text(collect_msgs[ci], animate=True)
+                                print(f"收集碎片 {len(collected_items)}/{len(collectibles)}")
+                                break
                 last_move_time = current_time
     # --- 打字机效果逐帧更新 ---
     if typewriter_active:
@@ -673,6 +692,16 @@ while running:
                             char_surface = small_code_font.render(char, True, (80, 200, 200))
                             char_rect = char_surface.get_rect(center=(cx, cy))
                             screen.blit(char_surface, char_rect)
+                # 绘制数据碎片（金色闪烁）
+                collectibles = CHAPTERS[current_chapter_index].get("collectibles", [])
+                for ci, (ccol, crow) in enumerate(collectibles):
+                    if (ccol, crow) not in collected_items and ccol == col and crow == row:
+                        cx = x + CELL_SIZE // 2
+                        cy = y + CELL_SIZE // 2
+                        if (pygame.time.get_ticks() // 300) % 2 == 0:
+                            pygame.draw.circle(screen, (255, 215, 0), (cx, cy), 8)
+                        else:
+                            pygame.draw.circle(screen, (255, 140, 0), (cx, cy), 5)
             elif render_mode == "gradient":
                 # 第三章：彩色渐变渲染
                 if map_data[row][col] == 1:
@@ -792,6 +821,14 @@ while running:
         pygame.draw.circle(screen, (0, 255, 200), (center_x, center_y), 20)
         pygame.draw.circle(screen, (255, 255, 255), (center_x, center_y), 20, 2)
 
+    # 第二章：右上角显示碎片进度
+    if render_mode == "ascii":
+        collectibles = CHAPTERS[current_chapter_index].get("collectibles", [])
+        if collectibles:
+            progress_text = f"碎片: {len(collected_items)}/{len(collectibles)}"
+            progress_surface = font.render(progress_text, True, (255, 215, 0))
+            progress_rect = progress_surface.get_rect(topright=(WIDTH - 15, 10))
+            screen.blit(progress_surface, progress_rect)
 
           # 3. 对话框显示AI文字
     box_margin = 10
