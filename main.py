@@ -149,7 +149,7 @@ CHAPTERS = [
             "@                              $",
             "@#$%&*+=|<>{}[]();:~^@#$%&*=  $",
             "@                              $",
-            "@ @#$   +=|<>{}[]();:~^@#$%&=|$",
+            "@ @#$   +=|<>{}[]();:~   $%&=|$",
             "@                              $",
             "@#$%&*+=|<>{}[]();:~^@   &*=  $",
             "@                              $",
@@ -1009,24 +1009,25 @@ while running:
             
             # 显示章节标题（带故障抖动）
             if text_alpha > 0:
-                intro_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 36)
-                title_surface = intro_font.render("CHAPTER 1: DESCEND", True, (150, 150, 150))
+                intro_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 64)
+                title_surface = intro_font.render("CHAPTER 1: DESCEND", True, (200, 200, 200))
                 title_surface.set_alpha(text_alpha)
                 title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
                 # 故障抖动：随机偏移
                 if random.random() < 0.15:
-                    jitter_x = random.randint(-4, 4)
-                    jitter_y = random.randint(-2, 2)
+                    jitter_x = random.randint(-5, 5)
+                    jitter_y = random.randint(-3, 3)
                 else:
                     jitter_x = jitter_y = 0
                 # 红色重影（故障感）
                 if random.random() < 0.1:
                     ghost = intro_font.render("CHAPTER 1: DESCEND", True, (255, 60, 60))
                     ghost.set_alpha(text_alpha // 2)
-                    ghost_rect = ghost.get_rect(center=(WIDTH // 2 + 3, HEIGHT // 2))
+                    ghost_rect = ghost.get_rect(center=(WIDTH // 2 + 4, HEIGHT // 2))
                     screen.blit(ghost, ghost_rect)
-                screen.blit(title_surface, (title_rect.x + jitter_x, title_rect.y + jitter_y))
-
+                # 假加粗：多偏移1像素绘制
+                for ox, oy in [(0, 0), (1, 0), (0, 1), (1, 1)]:
+                    screen.blit(title_surface, (title_rect.x + jitter_x + ox, title_rect.y + jitter_y + oy))
     # --- 章节过渡动画 ---
     if transition_state != "none":
         elapsed = pygame.time.get_ticks() - transition_start_time
@@ -1065,17 +1066,19 @@ while running:
             overlay.set_alpha(255)
             overlay.fill((0, 0, 0))
             screen.blit(overlay, (0, 0))
-            title_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 36)
+            title_font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 64)
             chapter_name = CHAPTERS[current_chapter_index]["name"]
-            title_surface = title_font.render(chapter_name, True, (150, 150, 150))
+            title_surface = title_font.render(chapter_name, True, (200, 200, 200))
             title_rect = title_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             # 故障抖动
             if random.random() < 0.15:
-                jitter_x = random.randint(-4, 4)
-                jitter_y = random.randint(-2, 2)
+                jitter_x = random.randint(-5, 5)
+                jitter_y = random.randint(-3, 3)
             else:
                 jitter_x = jitter_y = 0
-            screen.blit(title_surface, (title_rect.x + jitter_x, title_rect.y + jitter_y))
+            # 假加粗：多偏移1像素绘制
+            for ox, oy in [(0, 0), (1, 0), (0, 1), (1, 1)]:
+                screen.blit(title_surface, (title_rect.x + jitter_x + ox, title_rect.y + jitter_y + oy))
             if elapsed >= 2000:
                 transition_state = "fading_in"
                 transition_start_time = pygame.time.get_ticks()
