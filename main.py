@@ -2,7 +2,6 @@ import pygame
 import sys
 import requests
 import json
-import re
 import math
 import os
 import random
@@ -158,8 +157,6 @@ CHAPTERS = [
             "@                              $",
             "@#$%&*+=|<>{}[]();:~^@#$%&*+=|"
         ],
-        "render_mode": "ascii",
-        "fog_enabled": False,
         "messages": [
             'print("Hello, Human")',
             'print("I am learning...")',
@@ -333,7 +330,6 @@ intro_start_time = pygame.time.get_ticks()  # 记录开场开始时间
 intro_duration = 6000         # 总时长 6 秒（单位：毫秒）
 
 # ---------- 长按移动控制 ----------
-MOVE_COOLDOWN = 150  # 移动间隔（毫秒）
 last_move_time = 0   # 上次移动的时间
 
 # ---------- 章节过渡状态 ----------
@@ -583,7 +579,6 @@ while running:
             if event.key == pygame.K_SPACE:
                 chapter = CHAPTERS[current_chapter_index]
                 if chapter["messages"] is not None:
-                    import random
                     msg = random.choice(chapter["messages"])
                     set_ai_text(msg, animate=True)
                     print("电脑回应:", msg)
@@ -730,8 +725,6 @@ while running:
     screen.fill((10, 10, 30))  # 深空底色
     # 代码雨背景（仅第一章）
     if CHAPTERS[current_chapter_index]["render_mode"] == "binary":
-        for drop in code_rain:
-            ...
         for drop in code_rain:
             drop["y"] += drop["speed"]
             if drop["y"] > HEIGHT:
@@ -1040,28 +1033,15 @@ while running:
             screen.blit(overlay, (0, 0))
             if elapsed >= 1000:
                 # 切换地图（简化版：直接更新索引和地图数据）
-                current_chapter_index = next_chapter_index
-                maze_template = CHAPTERS[current_chapter_index]["maze"]
-                _max_len = max(len(r) for r in maze_template)
-                maze_template = [r.ljust(_max_len, ' ') for r in maze_template]
-                MAP_ROWS = len(maze_template)
-                MAP_COLS = len(maze_template[0])
-                rm = CHAPTERS[current_chapter_index]["render_mode"]
-                if rm == "binary":
-                    map_data = [[1 if ch == '1' else 0 for ch in row] for row in maze_template]
-                elif rm == "ascii":
-                    map_data = [[0 if ch == ' ' else 1 for ch in row] for row in maze_template]
-                elif rm == "robot":
-                    map_data = [[1 if ch == '#' else (2 if ch == 'C' else 0) for ch in row] for row in maze_template]
-                else:
-                    map_data = [[1 if ch == '#' else 0 for ch in row] for row in maze_template]
+
                 player_x, player_y = 1, 1
                 robot_mode_active = False
                 carrying_index = -1
                 set_ai_text("按 [空格键] 呼叫核心叙事者", animate=False)
                 transition_state = "title"
                 transition_start_time = pygame.time.get_ticks()
-        
+                current_chapter_index = next_chapter_index
+                load_chapter_data()        
         elif transition_state == "title":
             overlay.set_alpha(255)
             overlay.fill((0, 0, 0))
